@@ -88,7 +88,7 @@ import GhcPrelude
 import qualified GHC.LanguageExtensions as LangExt
 }
 
-%expect 235 -- shift/reduce conflicts
+--%expect 235 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -1936,6 +1936,7 @@ atype_docs :: { LHsType GhcPs }
         | atype                         { $1 }
 
 atype :: { LHsType GhcPs }
+--      : aexp2                          { EXP_TO_TYPE_FUNCTION $1 }
         : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
         | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
@@ -2150,7 +2151,7 @@ with constructor names (see Note [Parsing data constructors is hard]).
 
 Due to simplified syntax, GADT constructor names (left-hand side of '::')
 use simpler grammar production than usual data constructor names. As a
-consequence, GADT constructor names are resticted (names like '(*)' are
+consequence, GADT constructor names are restricted (names like '(*)' are
 allowed in usual data constructors, but not in GADTs).
 -}
 
@@ -2605,6 +2606,7 @@ aexp2   :: { LHsExpr GhcPs }
         | ipvar                         { sL1 $1 (HsIPVar noExt $! unLoc $1) }
         | overloaded_label              { sL1 $1 (HsOverLabel noExt Nothing $! unLoc $1) }
         | literal                       { sL1 $1 (HsLit noExt  $! unLoc $1) }
+        | ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
@@ -3148,7 +3150,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
                                        (mo $1:mc $3:(mcommas (fst $2))) }
         | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
-        | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
+--        | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
