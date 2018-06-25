@@ -1936,8 +1936,8 @@ atype_docs :: { LHsType GhcPs }
         | atype                         { $1 }
 
 atype :: { LHsType GhcPs }
---      : aexp2                          { EXP_TO_TYPE_FUNCTION $1 }
-        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
+        : pablotypeexp                   { pabloExpToType $1 }
+--        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
         | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
@@ -2600,13 +2600,16 @@ aexp1   :: { LHsExpr GhcPs }
                                      ; checkRecordSyntax (sLL $1 $> r) }}
         | aexp2                { $1 }
 
+pablotypeexp :: { LHsExpr GhcPs }
+        : ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
+
 aexp2   :: { LHsExpr GhcPs }
         : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
         | qcon                          { sL1 $1 (HsVar noExt   $! $1) }
         | ipvar                         { sL1 $1 (HsIPVar noExt $! unLoc $1) }
         | overloaded_label              { sL1 $1 (HsOverLabel noExt Nothing $! unLoc $1) }
         | literal                       { sL1 $1 (HsLit noExt  $! unLoc $1) }
-        | ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
+        --| ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)

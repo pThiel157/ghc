@@ -14,11 +14,16 @@ type NewType = Int
 --         ntgtycon -> oqtycon -> qtycon -> tycon -> CONID
 
 
--- ############ Parsing Tests: ############
--- We want the following function def to parse now that we've moved
---   ntgtycon into aexp2
-f :: a -> Int
-f LooksLikeATypeConButShouldParseAsAnExpressionNow = 42
+-- ############ Parsing Tests and Code: ############
+-- Parsing example that definitely uses ntgtycon:
+newtype N = N Int
+
+
+-- The type of the exp -> type function we want to write should be the following:
+pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
+pabloExpToType (sL1 x _) = sL1 x (HsTyVar noExt NotPromoted x)
+-- Note: The above doesn't work since you can't pattern match on function
+--   applications :(
 
 
 -- ############ Notes: ############
