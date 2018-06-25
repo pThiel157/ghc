@@ -3608,6 +3608,9 @@ sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 sLL :: Located a -> Located b -> c -> Located c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
+pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
+pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
+
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
