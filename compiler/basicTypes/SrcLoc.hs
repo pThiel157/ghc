@@ -512,6 +512,7 @@ pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
 data GenLocated l e = L l e
   deriving (Eq, Ord, Data, Functor, Foldable, Traversable)
 
+-- SrcSpan memorizes column for chunk of Haskell codes
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
 

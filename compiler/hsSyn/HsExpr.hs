@@ -271,6 +271,7 @@ information to use is the GlobalRdrEnv itself.
 -}
 
 -- | A Haskell expression.
+-- EF: X stands for extensions
 data HsExpr p
   = HsVar     (XVar p)
               (Located (IdP p)) -- ^ Variable
@@ -2897,4 +2898,3 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
-    

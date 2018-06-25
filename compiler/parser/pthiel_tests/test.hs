@@ -21,7 +21,8 @@ newtype N = N Int
 
 -- The type of the exp -> type function we want to write should be the following:
 pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
-pabloExpToType (sL1 x _) = sL1 x (HsTyVar noExt NotPromoted x)
+pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
+---pabloExpToType (sL1 x _) = sL1 x (HsTyVar noExt NotPromoted x)
 -- Note: The above doesn't work since you can't pattern match on function
 --   applications :(
 

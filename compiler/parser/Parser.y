@@ -2602,6 +2602,8 @@ aexp1   :: { LHsExpr GhcPs }
 
 pablotypeexp :: { LHsExpr GhcPs }
         : ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
+                                        -- uses pprTrace to trace this funciton whenever it iscalled
+                                        -- { pprTrace "TEST_PT" empty (sL1 $1 (HsVar noExt $! $1)}
 
 aexp2   :: { LHsExpr GhcPs }
         : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
@@ -3589,6 +3591,7 @@ comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
 {-# INLINE sL #-}
 sL :: SrcSpan -> a -> Located a
 sL span a = span `seq` a `seq` L span a
+-- EF `seq` force evaluation to avoid laziness
 
 -- See Note [Adding location info] for how these utility functions are used
 
