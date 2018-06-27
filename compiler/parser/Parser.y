@@ -3616,7 +3616,8 @@ pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
 pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
 
 dataName_to_FS :: Located RdrName -> FastString
-dataName_to_FS (L sp (Unqual occ_name )) = occNameFS occ_name--L sp (Unqual $ OccName tcClasName gcConid)
+dataName_to_FS (L sp (Unqual occ_name )) = occNameFS occ_name
+
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
