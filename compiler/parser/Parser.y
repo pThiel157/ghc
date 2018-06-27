@@ -3162,7 +3162,8 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-        : qtycon                        { $1 }
+        : qconid                        { dataName_to_FS $1 }
+        --qtycon                        { $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
@@ -3206,10 +3207,11 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
                                                [mj AnnBackquote $1,mj AnnVal $2
                                                ,mj AnnBackquote $3] }
 
+
 qtycon :: { Located RdrName }   -- Qualified or unqualified
         : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        | conid             { pprTrace "EP" empty (sL1 $1 $! mkUnqual tcClsName (dataName_to_FS $1)) }
-        --| tycon             { $1 }
+        -- EF: | conid             { pprTrace "EP" empty (sL1 $1 $! mkUnqual tcClsName (dataName_to_FS $1)) }
+        | tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
         : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
@@ -3615,8 +3617,12 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
 pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
 
-dataName_to_FS :: Located RdrName -> FastString
-dataName_to_FS (L sp (Unqual occ_name )) = occNameFS occ_name
+dataName_to_FS :: Located RdrName -> Located RdrName
+dataName_to_FS (L sp (Unqual occ_name)) = L sp (mkUnqual tcClsName fs)
+  where fs = occNameFS occ_name
+dataName_to_FS (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
+  where n = occNameFS occ_name
+        m = moduleNameFS mn
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
