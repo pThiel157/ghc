@@ -3209,9 +3209,10 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
-        : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        -- EF: | conid             { pprTrace "EP" empty (sL1 $1 $! mkUnqual tcClsName (dataCon_to_tyCon $1)) }
-        | tycon             { $1 }
+        : qconid              { pprTrace "conversion func" empty (dataCon_to_tyCon $1) }
+        --: QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
+        --| conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
+        --| tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
         : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
@@ -3387,7 +3388,7 @@ special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
 -- Data constructors
 
 qconid :: { Located RdrName }   -- Qualified or unqualified
-        : conid              { $1 }
+        : conid              { pprTrace "conid " empty $1 }
         | QCONID             { sL1 $1 $! mkQual dataName (getQCONID $1) }
 
 conid   :: { Located RdrName }
