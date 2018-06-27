@@ -3162,7 +3162,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-        : qconid                        { dataName_to_FS $1 }
+        : qconid                        { dataCon_to_tyCon $1 }
         --qtycon                        { $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
@@ -3210,7 +3210,7 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
         : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        -- EF: | conid             { pprTrace "EP" empty (sL1 $1 $! mkUnqual tcClsName (dataName_to_FS $1)) }
+        -- EF: | conid             { pprTrace "EP" empty (sL1 $1 $! mkUnqual tcClsName (dataCon_to_tyCon $1)) }
         | tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
@@ -3617,10 +3617,10 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
 pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
 
-dataName_to_FS :: Located RdrName -> Located RdrName
-dataName_to_FS (L sp (Unqual occ_name)) = L sp (mkUnqual tcClsName fs)
+dataCon_to_tyCon :: Located RdrName -> Located RdrName
+dataCon_to_tyCon (L sp (Unqual occ_name)) = L sp (mkUnqual tcClsName fs)
   where fs = occNameFS occ_name
-dataName_to_FS (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
+dataCon_to_tyCon (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
   where n = occNameFS occ_name
         m = moduleNameFS mn
 
