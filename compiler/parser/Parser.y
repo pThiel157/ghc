@@ -53,7 +53,10 @@ import Outputable
 
 -- compiler/basicTypes
 import RdrName
-import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+--import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+--EF
+import OccName          --( OccName, varName, dataName, tcClsName, tvName, startsWithUnderscore )
+-- EF
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
@@ -3091,12 +3094,12 @@ qcon_nowiredlist :: { Located RdrName }
 qcon :: { Located RdrName }
   : gen_qcon              { $1}
   | sysdcon               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
-
+ -- EF: sysdcon not highly related to ntgtycon
 gen_qcon :: { Located RdrName }
   : qconid                { $1 }
   | '(' qconsym ')'       {% ams (sLL $1 $> (unLoc $2))
                                    [mop $1,mj AnnVal $2,mcp $3] }
-
+  -- EF: qconsym similar to qtyconsym in ntgtycon
 con     :: { Located RdrName }
         : conid                 { $1 }
         | '(' consym ')'        {% ams (sLL $1 $> (unLoc $2))
@@ -3155,7 +3158,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
                                        (mo $1:mc $3:(mcommas (fst $2))) }
         | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
---        | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
+        | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
@@ -3205,7 +3208,8 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
         : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        | tycon             { $1 }
+        | conid             { pprTrace "EP" empty (sL1 $1 $! mkUnqual tcClsName (dataName_to_FS $1)) }
+        --| tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
         : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
@@ -3611,6 +3615,8 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
 pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
 
+dataName_to_FS :: Located RdrName -> FastString
+dataName_to_FS (L sp (Unqual occ_name )) = occNameFS occ_name--L sp (Unqual $ OccName tcClasName gcConid)
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
