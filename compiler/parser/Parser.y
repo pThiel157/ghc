@@ -3162,8 +3162,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-        : qconid                        { dataCon_to_tyCon $1 }
-        --qtycon                        { $1 }
+        : qtycon                        { $1 } --qconid                        { dataCon_to_tyCon $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
