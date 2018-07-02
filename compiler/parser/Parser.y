@@ -53,9 +53,9 @@ import Outputable
 
 -- compiler/basicTypes
 import RdrName
---import OccName          ( varName, dataName, tcClsName, tvName, startsWithUnderscore )
+import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace )
 --EF
-import OccName          --( OccName, varName, dataName, tcClsName, tvName, startsWithUnderscore )
+--import OccName          --( OccName, varName, dataName, tcClsName, tvName, startsWithUnderscore )
 -- EF
 import DataCon          ( DataCon, dataConName )
 import SrcLoc
@@ -1939,7 +1939,8 @@ atype_docs :: { LHsType GhcPs }
         | atype                         { $1 }
 
 atype :: { LHsType GhcPs }
-        : pablotypeexp                   { pabloExpToType $1 }
+-- maybe changing ntgtycon and tyvar to qcon and qvar
+        : parse_type_in_exp                   { lhsExpr_to_lhsType $1 }
 --        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
         | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
@@ -2603,10 +2604,15 @@ aexp1   :: { LHsExpr GhcPs }
                                      ; checkRecordSyntax (sLL $1 $> r) }}
         | aexp2                { $1 }
 
-pablotypeexp :: { LHsExpr GhcPs }
-        : ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
+parse_type_in_exp :: { LHsExpr GhcPs }
+        : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
+        | qcon                          { sL1 $1 (HsVar noExt   $! $1) }
+        --ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
                                         -- uses pprTrace to trace this funciton whenever it iscalled
                                         -- { pprTrace "TEST_PT" empty (sL1 $1 (HsVar noExt $! $1)}
+        -- qcon   {converted to type level, and apply function used for ntgtycon}
+        -- qvar {converted to type level, and apply function used for tyvar}
+
 
 aexp2   :: { LHsExpr GhcPs }
         : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
@@ -3209,10 +3215,14 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
+        -- EF
         : qconid              { dataCon_to_tyCon $1 }
+        -- EF
+        {- original
         --: QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
         --| conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
         --| tycon             { $1 }
+        -}
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
         : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
@@ -3221,17 +3231,12 @@ qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
 
-{- original
+
 qtyconsym :: { Located RdrName }
         : QCONSYM            { sL1 $1 $! mkQual tcClsName (getQCONSYM $1) }
         | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym           { $1 }
--}
 
---EF
-qtyconsym :: { Located RdrName }
-        : qconsym           {dataCon_to_tyCon $1}
---EF
 
 -- Does not include "!", because that is used for strictness marks
 --               or ".", because that separates the quantified type vars from the rest
@@ -3404,20 +3409,12 @@ conid   :: { Located RdrName }
 qconsym :: { Located RdrName }  -- Qualified or unqualified
         : consym               { $1 }
         | QCONSYM              { sL1 $1 $ mkQual dataName (getQCONSYM $1) }
-        --EF
-        | QVARSYM            { sL1 $1 $! mkQual dataName (getQVARSYM $1) }
-        --EF
 
 consym :: { Located RdrName }
         : CONSYM              { sL1 $1 $ mkUnqual dataName (getCONSYM $1) }
         -- CONSYM begins with colon
         -- ':' means only list cons
         | ':'                { sL1 $1 $ consDataCon_RDR }
-        --EF
-        | '-'                   { sL1 $1 $! mkUnqual dataName (fsLit "-") }
-        | VARSYM                { sL1 $1 $! mkUnqual dataName (getVARSYM $1) }
-        --EF
-
 
 -----------------------------------------------------------------------------
 -- Literals
@@ -3629,19 +3626,31 @@ sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 sLL :: Located a -> Located b -> c -> Located c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
-pabloExpToType :: LHsExpr GhcPs -> LHsType GhcPs
-pabloExpToType (L _ (HsVar _ ntg)) = sL1 ntg (HsTyVar noExt NotPromoted ntg)
+-- convert_nameSpace :: Located RdrName -> Located RdrName
+-- convert_nameSpace (L sp (Unqual occname)) = L sp (mkUnqual tvName fs)
+--   where fs = occNameFS occ_name
+
+
+-- converting LhsExpr to LhsType
+lhsExpr_to_lhsType :: LHsExpr GhcPs -> LHsType GhcPs
+lhsExpr_to_lhsType (L _ (HsVar _ t)) = sL1 (dataCon_to_tyCon t) (HsTyVar noExt NotPromoted $ dataCon_to_tyCon t)
+
+-- convert namespace from dataName to tcClsName (qconid -> qtycon)
+convertNS :: NameSpace -> NameSpace
+convertNS varName = tvName
+convertNS dataName = tcClsName
+
 
 dataCon_to_tyCon :: Located RdrName -> Located RdrName
-dataCon_to_tyCon (L sp (Unqual occ_name)) = L sp (mkUnqual tcClsName fs)
+dataCon_to_tyCon (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
+        ns = convertNS $ occNameSpace occ_name
+--dataCon_to_tyCon (L sp (Unqual occ_name) = L sp (mkUnqual tcClsName $ occNameFS occ_name)
 dataCon_to_tyCon (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
   where n = occNameFS occ_name
         m = moduleNameFS mn
 dataCon_to_tyCon c@(L _ (Exact _)) = c
 
---ntgtycon_convert :: Located RdrName -> Located RdrName
--- ntgtycon_convert: qvar / qcon -> type level
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -25,7 +25,7 @@
 
 module OccName (
         -- * The 'NameSpace' type
-        NameSpace, -- Abstract
+        NameSpace,  -- Abstract
 
         nameSpacesRelated,
 
