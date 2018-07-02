@@ -3169,7 +3169,8 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-        : qtycon                        { $1 } --qconid                        { dataCon_to_tyCon $1 }
+      --  : qconid                        { dataCon_to_tyCon $1 }
+        : qtycon                        { $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
@@ -3233,6 +3234,7 @@ tycon   :: { Located RdrName }  -- Unqualified
 
 
 qtyconsym :: { Located RdrName }
+      --  : qconsym            { dataCon_to_tyCon $1 }
         : QCONSYM            { sL1 $1 $! mkQual tcClsName (getQCONSYM $1) }
         | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym           { $1 }
@@ -3400,7 +3402,7 @@ special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
 -- Data constructors
 
 qconid :: { Located RdrName }   -- Qualified or unqualified
-        : conid              { $1 }
+        : conid              { {- pprTrace "conid " empty -} $1 }
         | QCONID             { sL1 $1 $! mkQual dataName (getQCONID $1) }
 
 conid   :: { Located RdrName }
