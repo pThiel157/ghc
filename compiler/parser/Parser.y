@@ -3160,6 +3160,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
+
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
       --  : qconid                        { dataCon_to_tyCon $1 }
@@ -3209,10 +3210,10 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
-        : qconid              { {- pprTrace "conversion func" empty -} (dataCon_to_tyCon $1) }
-       -- : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-       -- | conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
-       -- | tycon             { $1 }
+        : qconid              { dataCon_to_tyCon $1 }
+        --: QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
+        --| conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
+        --| tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
         : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
@@ -3221,11 +3222,18 @@ qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
 
+{- original
 qtyconsym :: { Located RdrName }
       --  : qconsym            { dataCon_to_tyCon $1 }
         : QCONSYM            { sL1 $1 $! mkQual tcClsName (getQCONSYM $1) }
         | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym           { $1 }
+-}
+
+--EF
+qtyconsym :: { Located RdrName }
+        : qconsym           {dataCon_to_tyCon $1}
+--EF
 
 -- Does not include "!", because that is used for strictness marks
 --               or ".", because that separates the quantified type vars from the rest
@@ -3398,18 +3406,19 @@ conid   :: { Located RdrName }
 qconsym :: { Located RdrName }  -- Qualified or unqualified
         : consym               { $1 }
         | QCONSYM              { sL1 $1 $ mkQual dataName (getQCONSYM $1) }
-        -- From tyconsym:
-      --  | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
+        --EF
+        | QVARSYM            { sL1 $1 $! mkQual dataName (getQVARSYM $1) }
+        --EF
 
 consym :: { Located RdrName }
         : CONSYM              { sL1 $1 $ mkUnqual dataName (getCONSYM $1) }
-
+        -- CONSYM begins with colon
         -- ':' means only list cons
         | ':'                { sL1 $1 $ consDataCon_RDR }
-        -- From tyconsym:
-      --  | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
-      --  | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
-
+        --EF
+        | '-'                   { sL1 $1 $! mkUnqual dataName (fsLit "-") }
+        | VARSYM                { sL1 $1 $! mkUnqual dataName (getVARSYM $1) }
+        --EF
 
 
 -----------------------------------------------------------------------------
@@ -3631,7 +3640,10 @@ dataCon_to_tyCon (L sp (Unqual occ_name)) = L sp (mkUnqual tcClsName fs)
 dataCon_to_tyCon (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
   where n = occNameFS occ_name
         m = moduleNameFS mn
-dataCon_to_tyCon x@(L sp (Exact _ )) = x
+dataCon_to_tyCon c@(L _ (Exact _)) = c
+
+--ntgtycon_convert :: Located RdrName -> Located RdrName
+-- ntgtycon_convert: qvar / qcon -> type level
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
