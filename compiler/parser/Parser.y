@@ -3162,7 +3162,8 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-        : qtycon                        { $1 } --qconid                        { dataCon_to_tyCon $1 }
+      --  : qconid                        { dataCon_to_tyCon $1 }
+        : qtycon                        { $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
         | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
@@ -3208,10 +3209,10 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
-        : qconid              { pprTrace "conversion func" empty (dataCon_to_tyCon $1) }
-        --: QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        --| conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
-        --| tycon             { $1 }
+        : qconid              { {- pprTrace "conversion func" empty -} (dataCon_to_tyCon $1) }
+       -- : QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
+       -- | conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
+       -- | tycon             { $1 }
 
 qtycondoc :: { LHsType GhcPs } -- Qualified or unqualified
         : qtycon            { sL1 $1                           (HsTyVar noExt NotPromoted $1)      }
@@ -3221,6 +3222,7 @@ tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
 
 qtyconsym :: { Located RdrName }
+      --  : qconsym            { dataCon_to_tyCon $1 }
         : QCONSYM            { sL1 $1 $! mkQual tcClsName (getQCONSYM $1) }
         | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym           { $1 }
@@ -3387,7 +3389,7 @@ special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
 -- Data constructors
 
 qconid :: { Located RdrName }   -- Qualified or unqualified
-        : conid              { pprTrace "conid " empty $1 }
+        : conid              { {- pprTrace "conid " empty -} $1 }
         | QCONID             { sL1 $1 $! mkQual dataName (getQCONID $1) }
 
 conid   :: { Located RdrName }
@@ -3396,12 +3398,18 @@ conid   :: { Located RdrName }
 qconsym :: { Located RdrName }  -- Qualified or unqualified
         : consym               { $1 }
         | QCONSYM              { sL1 $1 $ mkQual dataName (getQCONSYM $1) }
+        -- From tyconsym:
+      --  | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
 
 consym :: { Located RdrName }
         : CONSYM              { sL1 $1 $ mkUnqual dataName (getCONSYM $1) }
 
         -- ':' means only list cons
         | ':'                { sL1 $1 $ consDataCon_RDR }
+        -- From tyconsym:
+      --  | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
+      --  | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
+
 
 
 -----------------------------------------------------------------------------
@@ -3623,6 +3631,7 @@ dataCon_to_tyCon (L sp (Unqual occ_name)) = L sp (mkUnqual tcClsName fs)
 dataCon_to_tyCon (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
   where n = occNameFS occ_name
         m = moduleNameFS mn
+dataCon_to_tyCon x@(L sp (Exact _ )) = x
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
