@@ -73,7 +73,7 @@ import Lexer
 import HaddockUtils
 import ApiAnnotation
 --EF
-import Lexeme           (isLexVarSym, isLexVarId, Token)
+import Lexeme           (isLexVarSym, isLexVarId)
 --EF
 
 -- compiler/typecheck
@@ -1943,9 +1943,9 @@ atype_docs :: { LHsType GhcPs }
 
 atype :: { LHsType GhcPs }
 -- maybe changing ntgtycon and tyvar to qcon and qvar
-      --  : parse_type_in_exp                   { lhsExpr_to_lhsType $1 }
-        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
+        : parse_type_in_exp                   { lhsExpr_to_lhsType $1 }
+      --  : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
+      --  | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy noExt (snd $ unLoc $1) $2))
@@ -3643,24 +3643,21 @@ lhsExpr_to_lhsType (L _ (HsVar _ t)) = sL1 (loc_rdr_exp_to_type t) (HsTyVar noEx
 -- converts namespace for a given faststring
 convertNS :: FastString -> NameSpace -> NameSpace
 convertNS fs ns
-  | (isVarNameSpace ns) && (isLexVarSym fs) = tcClsName
-  | isVarNameSpace ns                       = tvName
-  | isDataConNameSpace ns                   = tcClsName
+  | (isVarNameSpace ns) && (isLexVarSym fs)  = tcClsName
+  | (isVarNameSpace ns) && (fsLit "-" == fs) = tcClsName
+  | isVarNameSpace ns                        = tvName
+  | isDataConNameSpace ns                    = tcClsName
 
 
 loc_rdr_exp_to_type :: Located RdrName -> Located RdrName
-
 loc_rdr_exp_to_type (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
         ns  = convertNS fs (occNameSpace occ_name)
-
 loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual ns (mfs, fs))
   where fs = occNameFS occ_name
         mfs = moduleNameFS mn                        -- mfs: module fast string
-        ns = convertNs fs (occNameSpace occ_name)
-
-loc_rdr_exp_to_type c@(L _ (Exact _)) = c
-
+        ns = convertNS fs (occNameSpace occ_name)
+loc_rdr_exp_to_type c@(L _ (Exact _)) = c  -- for '(' ':' ')' case
 loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
 
 
