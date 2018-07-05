@@ -1940,8 +1940,8 @@ atype_docs :: { LHsType GhcPs }
 
 atype :: { LHsType GhcPs }
 -- maybe changing ntgtycon and tyvar to qcon and qvar
-        : parse_type_in_exp                   { lhsExpr_to_lhsType $1 }
---        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
+      --  : parse_type_in_exp                   { lhsExpr_to_lhsType $1 }
+        : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
         | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
@@ -3098,7 +3098,7 @@ qcon_nowiredlist :: { Located RdrName }
         | sysdcon_nolist               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
 
 qcon :: { Located RdrName }
-  : gen_qcon              { $1}
+  : gen_qcon              { $1 }
   | sysdcon               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
  -- EF: sysdcon not highly related to ntgtycon
 gen_qcon :: { Located RdrName }
@@ -3169,7 +3169,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-      --  : qconid                        { dataCon_to_tyCon $1 }
+      --  : qconid                        { loc_rdr_exp_to_type $1 }
         : qtycon                        { $1 }
         | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
                                                [mop $1,mj AnnVal $2,mcp $3] }
@@ -3217,11 +3217,11 @@ qtyconop :: { Located RdrName } -- Qualified or unqualified
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
         -- EF
-        : qconid              { dataCon_to_tyCon $1 }
+        : qconid              { loc_rdr_exp_to_type $1 }
         -- EF
         {- original
         --: QCONID            { sL1 $1 $! mkQual tcClsName (getQCONID $1) }
-        --| conid             { pprTrace "EP" empty (dataCon_to_tyCon $1) }
+        --| conid             { pprTrace "EP" empty (loc_rdr_exp_to_type $1) }
         --| tycon             { $1 }
         -}
 
@@ -3234,7 +3234,7 @@ tycon   :: { Located RdrName }  -- Unqualified
 
 
 qtyconsym :: { Located RdrName }
-      --  : qconsym            { dataCon_to_tyCon $1 }
+      --  : qconsym            { loc_rdr_exp_to_type $1 }
         : QCONSYM            { sL1 $1 $! mkQual tcClsName (getQCONSYM $1) }
         | QVARSYM            { sL1 $1 $! mkQual tcClsName (getQVARSYM $1) }
         | tyconsym           { $1 }
@@ -3635,23 +3635,27 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 -- converting LhsExpr to LhsType
 lhsExpr_to_lhsType :: LHsExpr GhcPs -> LHsType GhcPs
-lhsExpr_to_lhsType (L _ (HsVar _ t)) = sL1 (dataCon_to_tyCon t) (HsTyVar noExt NotPromoted $ dataCon_to_tyCon t)
+lhsExpr_to_lhsType (L _ (HsVar _ t)) = sL1 (loc_rdr_exp_to_type t) (HsTyVar noExt NotPromoted $ loc_rdr_exp_to_type t)
 
--- convert namespace from dataName to tcClsName (qconid -> qtycon)
+-- convert namespace from dataName to tcClsName and from varName to tvName
 convertNS :: NameSpace -> NameSpace
 convertNS varName = tvName
 convertNS dataName = tcClsName
 
 
-dataCon_to_tyCon :: Located RdrName -> Located RdrName
-dataCon_to_tyCon (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
+loc_rdr_exp_to_type :: Located RdrName -> Located RdrName
+loc_rdr_exp_to_type (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
         ns = convertNS $ occNameSpace occ_name
---dataCon_to_tyCon (L sp (Unqual occ_name) = L sp (mkUnqual tcClsName $ occNameFS occ_name)
-dataCon_to_tyCon (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
+loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
   where n = occNameFS occ_name
         m = moduleNameFS mn
-dataCon_to_tyCon c@(L _ (Exact _)) = c
+loc_rdr_exp_to_type c@(L _ (Exact _)) = c
+
+loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
+
+
+
 
 
 {- Note [Adding location info]
