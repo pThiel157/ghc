@@ -53,7 +53,7 @@ import Outputable
 
 -- compiler/basicTypes
 import RdrName
-import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace )
+import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace, isVarNameSpace, isDataConNameSpace )
 --EF
 --import OccName          --( OccName, varName, dataName, tcClsName, tvName, startsWithUnderscore )
 -- EF
@@ -72,6 +72,9 @@ import RdrHsSyn
 import Lexer
 import HaddockUtils
 import ApiAnnotation
+--EF
+import Lexeme           (isLexVarSym, isLexVarId, Token)
+--EF
 
 -- compiler/typecheck
 import TcEvidence       ( emptyTcEvBinds )
@@ -3637,19 +3640,25 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 lhsExpr_to_lhsType :: LHsExpr GhcPs -> LHsType GhcPs
 lhsExpr_to_lhsType (L _ (HsVar _ t)) = sL1 (loc_rdr_exp_to_type t) (HsTyVar noExt NotPromoted $ loc_rdr_exp_to_type t)
 
--- convert namespace from dataName to tcClsName and from varName to tvName
-convertNS :: NameSpace -> NameSpace
-convertNS varName = tvName
-convertNS dataName = tcClsName
+-- converts namespace for a given faststring
+convertNS :: FastString -> NameSpace -> NameSpace
+convertNS fs ns
+  | (isVarNameSpace ns) && (isLexVarSym fs) = tcClsName
+  | isVarNameSpace ns                       = tvName
+  | isDataConNameSpace ns                   = tcClsName
 
 
 loc_rdr_exp_to_type :: Located RdrName -> Located RdrName
+
 loc_rdr_exp_to_type (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
-        ns = convertNS $ occNameSpace occ_name
-loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual tcClsName (m, n))
-  where n = occNameFS occ_name
-        m = moduleNameFS mn
+        ns  = convertNS fs (occNameSpace occ_name)
+
+loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual ns (mfs, fs))
+  where fs = occNameFS occ_name
+        mfs = moduleNameFS mn                        -- mfs: module fast string
+        ns = convertNs fs (occNameSpace occ_name)
+
 loc_rdr_exp_to_type c@(L _ (Exact _)) = c
 
 loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
