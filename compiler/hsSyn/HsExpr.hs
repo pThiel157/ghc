@@ -799,16 +799,11 @@ type instance XEViewPat      (GhcPass _) = NoExt
 type instance XELazyPat      (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
 type instance XXExpr         (GhcPass _) = NoExt
-<<<<<<< HEAD
 --EF
-type instance XTArrow        (GhcPass _) = NoExt
---EF
-=======
-
 type instance XTArrow        (GhcPass _) = NoExt
 type instance XTTwiddle      (GhcPass _) = NoExt
+--EF
 
->>>>>>> ccc5f938c4ea7ae809b07c945c41d3e187f85d00
 -- ---------------------------------------------------------------------
 
 -- | Located Haskell Tuple Argument
@@ -1166,6 +1161,11 @@ ppr_expr (HsArrForm _ op _ args)
          4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
 ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = ppr x
+--EF
+ppr_expr (TArrow   _) = parens arrow
+ppr_expr (TTwiddle _) = parens $ char '~'
+--EF
+
 
 ppr_apps :: (OutputableBndrId (GhcPass p))
          => HsExpr (GhcPass p)
