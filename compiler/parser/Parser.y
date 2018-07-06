@@ -55,13 +55,15 @@ import Outputable
 import RdrName
 --EF
 import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace, isVarNameSpace, isDataConNameSpace )
-import Name             (nameUnique)
+import Name             (nameUnique, wiredInNameTyThing_maybe)
 import TysWiredIn       (nilDataConKey)
 import PrelNames        (consDataConKey)
+import Id               (isDataConId_maybe)
+import TyCoRep
 --EF
 --import OccName          --( OccName, varName, dataName, tcClsName, tvName, startsWithUnderscore )
 -- EF
-import DataCon          ( DataCon, dataConName )
+import DataCon          ( DataCon, dataConName, dataConTyCon )
 import SrcLoc
 import Module
 import BasicTypes
@@ -3668,6 +3670,11 @@ loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual ns (mfs, fs))
 loc_rdr_exp_to_type c@(L sp (Exact name))
   | (nameUnique name == nilDataConKey)  = L sp listTyCon_RDR
   | (nameUnique name == consDataConKey) = c
+  | otherwise = case (wiredInNameTyThing_maybe name) of
+                  Just t@(AnId id) -> case (isDataConId_maybe id) of
+                                        Just datacon -> L sp (getRdrName $ dataConTyCon datacon)
+                                        Nothing -> error "The impossible has happened again!"
+                  Nothing -> error "The impossible has happened!"
 loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
 
 -- Old version for '(' ':' ')' case, now handled above
