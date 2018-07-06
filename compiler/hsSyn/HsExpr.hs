@@ -799,11 +799,7 @@ type instance XEViewPat      (GhcPass _) = NoExt
 type instance XELazyPat      (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
 type instance XXExpr         (GhcPass _) = NoExt
-<<<<<<< HEAD
-
-=======
 --EF
->>>>>>> c5582d098b164253a2419851fda5961ac3f01ff5
 type instance XTArrow        (GhcPass _) = NoExt
 type instance XTTwiddle      (GhcPass _) = NoExt
 --EF
@@ -1277,8 +1273,8 @@ hsExprNeedsParens p = go
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
     go (XExpr{})                      = True
-    go (XTArrow{})                    = False
-    go (XTTwiddle{})                  = False
+    go (TArrow{})                    = False
+    go (TTwiddle{})                  = False
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.

@@ -3555,6 +3555,9 @@ exprCtOrigin (EViewPat {})      = panic "exprCtOrigin EViewPat"
 exprCtOrigin (ELazyPat {})      = panic "exprCtOrigin ELazyPat"
 exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 exprCtOrigin (XExpr {})         = panic "exprCtOrigin XExpr"
+exprCtOrigin (TArrow {})        = panic "exprCtOrigin TArrow"
+exprCtOrigin (TTwiddle {})        = panic "exprCtOrigin TTwiddle"
+
 
 -- | Extract a suitable CtOrigin from a MatchGroup
 matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
