@@ -271,7 +271,6 @@ information to use is the GlobalRdrEnv itself.
 -}
 
 -- | A Haskell expression.
--- EF: X stands for extensions
 data HsExpr p
   = HsVar     (XVar p)
               (Located (IdP p)) -- ^ Variable
@@ -682,6 +681,10 @@ data HsExpr p
 
   | XExpr       (XXExpr p) -- Note [Trees that Grow] extension constructor
 
+--EF
+  | TArrow      (XTArrow p)
+  | TTwiddle    (XTTwiddle p)
+--EF
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
 data RecordConTc = RecordConTc
@@ -796,7 +799,9 @@ type instance XEViewPat      (GhcPass _) = NoExt
 type instance XELazyPat      (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
 type instance XXExpr         (GhcPass _) = NoExt
-
+--EF
+type instance XTArrow        (GhcPass _) = NoExt
+--EF
 -- ---------------------------------------------------------------------
 
 -- | Located Haskell Tuple Argument
