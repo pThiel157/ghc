@@ -2623,7 +2623,7 @@ aexp2   :: { LHsExpr GhcPs }
         | ipvar                         { sL1 $1 (HsIPVar noExt $! unLoc $1) }
         | overloaded_label              { sL1 $1 (HsOverLabel noExt Nothing $! unLoc $1) }
         | literal                       { sL1 $1 (HsLit noExt  $! unLoc $1) }
-        --| ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
+      --  | ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
 --      | STRING    { sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRINGs $1)
@@ -3653,11 +3653,19 @@ loc_rdr_exp_to_type :: Located RdrName -> Located RdrName
 loc_rdr_exp_to_type (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
         ns  = convertNS fs (occNameSpace occ_name)
+
 loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual ns (mfs, fs))
   where fs = occNameFS occ_name
         mfs = moduleNameFS mn                        -- mfs: module fast string
         ns = convertNS fs (occNameSpace occ_name)
-loc_rdr_exp_to_type c@(L _ (Exact _)) = c  -- for '(' ':' ')' case
+
+loc_rdr_exp_to_type c@(L sp (Exact name))
+  | (n_uniq name == nilDataConKey)  = L sp listTyCon_RDR
+  | (n_uniq name == consDataConKey) = c
+
+-- Old version for '(' ':' ')' case, now handled above
+--loc_rdr_exp_to_type c@(L _ (Exact _)) = c
+
 loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
 
 
