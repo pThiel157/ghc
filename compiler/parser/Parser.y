@@ -2614,13 +2614,8 @@ aexp1   :: { LHsExpr GhcPs }
 parse_type_in_exp :: { LHsExpr GhcPs }
         : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
         | qcon                          { sL1 $1 (HsVar noExt   $! $1) }
-<<<<<<< HEAD
-        | '(' -> ')'                    { sLL $1 $> (TArrow noExt  $1) }
-        | '(' '~' ')'                   { sLL $1 $> (TTwiddle noExt $1) }
-=======
         | '(' '->' ')'                  { sLL $1 $> (TArrow noExt) }    -- Annotations here?
         | '(' '~' ')'                   { sLL $1 $> (TTwiddle noExt) }  -- Annotations here?
->>>>>>> ccc5f938c4ea7ae809b07c945c41d3e187f85d00
         --ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
                                         -- uses pprTrace to trace this funciton whenever it iscalled
                                         -- { pprTrace "TEST_PT" empty (sL1 $1 (HsVar noExt $! $1)}
@@ -3649,17 +3644,9 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 -- converting LhsExpr to LhsType
 lhsExpr_to_lhsType :: LHsExpr GhcPs -> LHsType GhcPs
-<<<<<<< HEAD
-lhsExpr_to_lhsType (L sp (HsVar _ t)) = L sp (HsTyVar noExt NotPromoted $ loc_rdr_exp_to_type t)
-lhsExpr_to_lhsType (L sp (TArrow _ a)) = L sp (HsTyvar noExt NotPromoted $ getRdrName funcTycon)
-lhsExpr_to_lhsType (L sp (TTwiddle _ a)) = L sp (HsTyvar noExt NotPromoted $ listTyCon_RDR)
-
--- add a case for arrow and '~'
-=======
 lhsExpr_to_lhsType (L sp (HsVar _ t))    = L sp (HsTyVar noExt NotPromoted $ loc_rdr_exp_to_type t)
 lhsExpr_to_lhsType (L sp (TArrow _ t))   = L sp (HsTyVar noExt NotPromoted $ (getRdrName funTyCon))
 lhsExpr_to_lhsType (L sp (TTwiddle _ t)) = L sp (HsTyVar noExt NotPromoted $ (eqTyCon_RDR))
->>>>>>> ccc5f938c4ea7ae809b07c945c41d3e187f85d00
 
 -- converts namespace for a given faststring
 convertNS :: FastString -> NameSpace -> NameSpace
