@@ -682,6 +682,9 @@ data HsExpr p
 
   | XExpr       (XXExpr p) -- Note [Trees that Grow] extension constructor
 
+  | TArrow      (XTArrow p)
+  | TTwiddle    (XTTwiddle p)
+
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
 data RecordConTc = RecordConTc
@@ -796,6 +799,9 @@ type instance XEViewPat      (GhcPass _) = NoExt
 type instance XELazyPat      (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
 type instance XXExpr         (GhcPass _) = NoExt
+
+type instance XTArrow        (GhcPass _) = NoExt
+type instance XTTwiddle      (GhcPass _) = NoExt
 
 -- ---------------------------------------------------------------------
 

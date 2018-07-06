@@ -534,6 +534,7 @@ type family XEViewPat       x
 type family XELazyPat       x
 type family XWrap           x
 type family XXExpr          x
+type family XTArrow         x
 
 type ForallXExpr (c :: * -> Constraint) (x :: *) =
        ( c (XVar            x)
@@ -584,6 +585,7 @@ type ForallXExpr (c :: * -> Constraint) (x :: *) =
        , c (XELazyPat       x)
        , c (XWrap           x)
        , c (XXExpr          x)
+       , c (XTArrow         x)
        )
 -- ---------------------------------------------------------------------
 
