@@ -53,7 +53,11 @@ import Outputable
 
 -- compiler/basicTypes
 import RdrName
+--EF
 import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace, isVarNameSpace, isDataConNameSpace )
+import Name             (nameUnique)
+import TysWiredIn       (nilDataConKey)
+import PrelNames        (consDataConKey)
 --EF
 --import OccName          --( OccName, varName, dataName, tcClsName, tvName, startsWithUnderscore )
 -- EF
@@ -3653,20 +3657,18 @@ loc_rdr_exp_to_type :: Located RdrName -> Located RdrName
 loc_rdr_exp_to_type (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
         ns  = convertNS fs (occNameSpace occ_name)
-
 loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual ns (mfs, fs))
   where fs = occNameFS occ_name
         mfs = moduleNameFS mn                        -- mfs: module fast string
         ns = convertNS fs (occNameSpace occ_name)
-
 loc_rdr_exp_to_type c@(L sp (Exact name))
-  | (n_uniq name == nilDataConKey)  = L sp listTyCon_RDR
-  | (n_uniq name == consDataConKey) = c
+  | (nameUnique name == nilDataConKey)  = L sp listTyCon_RDR
+  | (nameUnique name == consDataConKey) = c
+loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
 
 -- Old version for '(' ':' ')' case, now handled above
 --loc_rdr_exp_to_type c@(L _ (Exact _)) = c
 
-loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled case!"
 
 
 
