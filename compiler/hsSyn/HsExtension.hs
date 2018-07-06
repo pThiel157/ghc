@@ -590,6 +590,7 @@ type ForallXExpr (c :: * -> Constraint) (x :: *) =
        , c (XXExpr          x)
        --EF
        , c (XTArrow         x)
+       , c (XTTwiddle       x)
        --EF
        )
 -- ---------------------------------------------------------------------
