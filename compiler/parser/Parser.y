@@ -3645,8 +3645,8 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 -- converting LhsExpr to LhsType
 lhsExpr_to_lhsType :: LHsExpr GhcPs -> LHsType GhcPs
 lhsExpr_to_lhsType (L sp (HsVar _ t))    = L sp (HsTyVar noExt NotPromoted $ loc_rdr_exp_to_type t)
-lhsExpr_to_lhsType (L sp (TArrow _ t))   = L sp (getRdrName funTyCon)
-lhsExpr_to_lhsType (L sp (TTwiddle _ t)) = L sp (eqTyCon_RDR)
+lhsExpr_to_lhsType (L sp (TArrow _ t))   = L sp (HsTyVar noExt NotPromoted $ (getRdrName funTyCon))
+lhsExpr_to_lhsType (L sp (TTwiddle _ t)) = L sp (HsTyVar noExt NotPromoted $ (eqTyCon_RDR))
 
 -- converts namespace for a given faststring
 convertNS :: FastString -> NameSpace -> NameSpace
