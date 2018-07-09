@@ -1755,8 +1755,8 @@ fspec :: { Located ([AddAnn]
 -- Type signatures
 
 opt_sig :: { ([AddAnn], Maybe (LHsType GhcPs)) }
-        : {- empty -}                   { ([],Nothing) }
-        | '::' sigtype                  { ([mu AnnDcolon $1],Just $2) }
+        : {- empty -}                   { ([], Nothing) }
+        | '::' sigtype                  { ([mu AnnDcolon $1], Just $2) }
 
 opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
              : {- empty -}              { ([], Nothing) }
@@ -1931,7 +1931,10 @@ btype_no_ops :: { Located [LHsType GhcPs] } -- NB: This list is reversed
         | btype_no_ops atype_docs       { sLL $1 $> $ $2 : (unLoc $1) }
 
 tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
-        : tyapp                         { sL1 $1 [$1] }
+      --  : tyapp                         { sL1 $1 [$1] }
+        : atype                         { sL1 (sL1 $1 $ TyElOpd (unLoc $1))
+                                              [sL1 $1 $ TyElOpd (unLoc $1)] }
+      --  | '*'                           { undefined }
         | tyapps tyapp                  { sLL $1 $> $ $2 : (unLoc $1) }
 
 tyapp :: { Located TyEl }
