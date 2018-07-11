@@ -1963,17 +1963,17 @@ atype :: { LHsType GhcPs }
                                                     (sLL $1 $> $ HsRecTy noExt $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
-        | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
-                                                    HsBoxedOrConstraintTuple [])
-                                                [mop $1,mcp $2] }
+      --  | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
+      --                                              HsBoxedOrConstraintTuple [])
+      --                                          [mop $1,mcp $2] }
         | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
                                                           (gl $3) >>
                                             ams (sLL $1 $> $ HsTupleTy noExt
 
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
-        | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
-                                             [mo $1,mc $2] }
+      --  | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
+      --                                       [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
                                              [mo $1,mc $3] }
         | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
