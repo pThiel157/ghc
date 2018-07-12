@@ -54,7 +54,7 @@ import Outputable
 -- compiler/basicTypes
 import RdrName
 --EF
-import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace, isVarNameSpace, isDataConNameSpace )
+import OccName          ( NameSpace, varName, dataName, tcClsName, tvName, startsWithUnderscore, occNameFS, occNameSpace, isVarNameSpace, isDataConNameSpace, isTvNameSpace )
 import Name             (nameUnique, wiredInNameTyThing_maybe)
 import TysWiredIn       (nilDataConKey)
 import PrelNames        (consDataConKey)
@@ -1931,10 +1931,12 @@ btype_no_ops :: { Located [LHsType GhcPs] } -- NB: This list is reversed
         | btype_no_ops atype_docs       { sLL $1 $> $ $2 : (unLoc $1) }
 
 tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
-      --  : tyapp                         { sL1 $1 [$1] }
+      --  : tyapp
+      --EF                       { sL1 $1 [$1] }
         : atype                         { sL1 (sL1 $1 $ TyElOpd (unLoc $1))
                                               [sL1 $1 $ TyElOpd (unLoc $1)] }
-      --  | '*'                           { undefined }
+      --  | '*'
+      --EF                         { undefined }
         | tyapps tyapp                  { sLL $1 $> $ $2 : (unLoc $1) }
 
 tyapp :: { Located TyEl }
@@ -1962,17 +1964,17 @@ atype :: { LHsType GhcPs }
                                                     (sLL $1 $> $ HsRecTy noExt $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
-      --  | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
+      {---EF  | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
       --                                              HsBoxedOrConstraintTuple [])
-      --                                          [mop $1,mcp $2] }
+                                                  [mop $1,mcp $2] } --EF-}
         | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
                                                           (gl $3) >>
                                             ams (sLL $1 $> $ HsTupleTy noExt
 
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
-      --  | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
-      --                                       [mo $1,mc $2] }
+      {---EF  | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
+                                               [mo $1,mc $2] }  --EF-}
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
                                              [mo $1,mc $3] }
         | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
@@ -2044,10 +2046,17 @@ tv_bndrs :: { [LHsTyVarBndr GhcPs] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr GhcPs }
+        : tyvarid                         { sL1 $1 (UserTyVar noExt $1) }
+        | '(' tyvarid '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar noExt $2 $4))
+                                               [mop $1,mu AnnDcolon $3
+                                               ,mcp $5] }
+{- --EF
         : tyvar                         { sL1 $1 (UserTyVar noExt $1) }
         | '(' tyvar '::' kind ')'       {% ams (sLL $1 $>  (KindedTyVar noExt $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
+--EF -}
+
 
 fds :: { Located ([AddAnn],[Located (FunDep (Located RdrName))]) }
         : {- empty -}                   { noLoc ([],[]) }
@@ -3408,6 +3417,7 @@ qvar    :: { Located RdrName }
                                        [mop $1,mj AnnVal $2,mcp $3] }
         | '(' qvarsym1 ')'      {% ams (sLL $1 $> (unLoc $2))
                                        [mop $1,mj AnnVal $2,mcp $3] }
+
 -- We've inlined qvarsym here so that the decision about
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.
@@ -3429,6 +3439,14 @@ varid :: { Located RdrName }
         | 'forall'         { sL1 $1 $! mkUnqual varName (fsLit "forall") }
         | 'family'         { sL1 $1 $! mkUnqual varName (fsLit "family") }
         | 'role'           { sL1 $1 $! mkUnqual varName (fsLit "role") }
+{--EF
+        : tyvarid          {$1 }
+        | 'forall'         { sL1 $1 $! mkUnqual varName (fsLit "forall") }
+        | 'family'         { sL1 $1 $! mkUnqual varName (fsLit "family") }
+        | 'role'           { sL1 $1 $! mkUnqual varName (fsLit "role") }
+--EF-}
+
+
 
 qvarsym :: { Located RdrName }
         : varsym                { $1 }
@@ -3724,16 +3742,18 @@ lhsExpr_to_lhsType (L sp (TTwiddle _)) = L sp (HsTyVar noExt NotPromoted $ (L sp
 -- converts namespace for a given faststring
 convertNS :: FastString -> NameSpace -> NameSpace
 convertNS fs ns
-  | (isVarNameSpace ns) && (isLexVarSym fs)  = tcClsName
-  | (isVarNameSpace ns) && (fsLit "-" == fs) = tcClsName
-  | isVarNameSpace ns                        = tvName
-  | isDataConNameSpace ns                    = tcClsName
-
+  | (isVarNameSpace ns) && (isLexVarSym fs)    = tcClsName
+  | (isVarNameSpace ns) && (fsLit "-" == fs)   = tcClsName
+  | isDataConNameSpace ns                      = tcClsName
+  | isVarNameSpace ns                          = tvName
+  -- | (isTvNameSpace ns) && (! fs `elem` fs_lis) = varName
+  --   where fs_lis = [fsLit "forall", fsLit "family", fsLit "role"]
 
 loc_rdr_exp_to_type :: Located RdrName -> Located RdrName
 loc_rdr_exp_to_type (L sp (Unqual occ_name)) = L sp (mkUnqual ns fs)
   where fs = occNameFS occ_name
         ns  = convertNS fs (occNameSpace occ_name)
+
 loc_rdr_exp_to_type (L sp (Qual mn occ_name)) = L sp (mkQual ns (mfs, fs))
   where fs = occNameFS occ_name
         mfs = moduleNameFS mn                        -- mfs: module fast string

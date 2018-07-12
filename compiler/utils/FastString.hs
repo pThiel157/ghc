@@ -47,6 +47,10 @@ module FastString
         -- * FastStrings
         FastString(..),     -- not abstract, for now.
 
+        -- data FastStrings
+        FastStrings,
+        mkFSQual, mkFSUnqual,
+
         -- ** Construction
         fsLit,
         mkFastString,
@@ -179,6 +183,17 @@ Z-encoding used by the compiler internally.
 
 'FastString's support a memoized conversion to the Z-encoding via zEncodeFS.
 -}
+
+-- EF
+--  for storing faststrings for terms
+data FastStrings = UnqualFS FastString | QualFS FastString FastString
+
+mkFSUnqual :: FastString -> FastStrings
+mkFSUnqual fs = UnqualFS fs
+
+mkFSQual :: (FastString, FastString) -> FastStrings
+mkFSQual (mfs, nfs) = QualFS mfs nfs
+--EF
 
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
