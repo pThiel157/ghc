@@ -1953,12 +1953,11 @@ atype_docs :: { LHsType GhcPs }
         | atype                         { $1 }
 
 atype :: { LHsType GhcPs }
--- maybe changing ntgtycon and tyvar to qcon and qvar
         : parse_type_in_exp                   { lhsExpr_to_lhsType $1 }
       --  : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
       --  | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
-                                               ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
+      --                                         ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy noExt (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -2555,6 +2554,74 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 , getINTEGERs $9
                                                 )))
                                          }
+terms     :: { LHsTerm }  -- what should we do on the right hand side for this???
+          : term
+          | terms term
+
+term      :: { LHsTerm }
+          : '(' terms ')'
+          | '(#' terms '#)'
+          | '[' terms ']' -- confirm with Richard for '['']'
+          | '`' terms '`'
+          | gen_name
+          | 'let' binds 'in' terms
+          | 'if' terms 'then' terms 'else' terms
+
+{-
+gen_names :: { LHsTerm }
+          : gen_name
+          : gen_names gen_name
+-}
+
+gen_name  :: { Located FastStrings }  -- Should this be a located faststring? Probably not. Probably want located RdrName
+          : 'forall'
+          | 'safe'
+          | 'interruptible'
+          | 'forall'
+          | 'family'
+          | 'role'
+          | 'unsafe'
+          | special_id
+          | gen_literal
+          | QCONID               { sL1 $1 Fss  }
+          | CONID
+          | QCONSYM
+          | CONSYM
+          | QVARID
+          | VARID
+          | QVARSYM
+          | VARSYM
+          -- From ipvar:
+          | IPDUPVARID
+          -- From overloaded_label:
+          | LABELVARID
+          ------------
+          | ':'
+          | ','
+          | '..'
+          | '->'
+          | '~'
+          | '@'
+          | '_'
+          | ';'  -- optSemi
+          | special_sym  -- {'!', '.', '*'}
+          | -- empty
+
+gen_literal :: {  }
+          -- From literal in aexp2:
+          : CHAR
+          | STRING
+          | PRIMINTEGER
+          | PRIMWORD
+          | PRIMCHAR
+          | PRIMSTRING
+          | PRIMFLOAT
+          | PRIMDOUBLE
+          -- From the main body of aexp2 (should these be here? What's the difference between a PRIMINTEGER and a regular INTEGER)
+          | INTEGER
+          | RATIONAL
+
+
 
 fexp    :: { LHsExpr GhcPs }
         : fexp aexp                  {% checkBlockArguments $1 >> checkBlockArguments $2 >>

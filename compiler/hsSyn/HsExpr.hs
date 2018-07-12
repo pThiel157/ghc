@@ -684,6 +684,7 @@ data HsExpr p
 --EF
   | TArrow      (XTArrow p)
   | TTwiddle    (XTTwiddle p)
+  | Star        (XStar p)
 --EF
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
@@ -802,6 +803,7 @@ type instance XXExpr         (GhcPass _) = NoExt
 --EF
 type instance XTArrow        (GhcPass _) = NoExt
 type instance XTTwiddle      (GhcPass _) = NoExt
+type instance XStar          (GhcPass _) = NoExt
 --EF
 
 -- ---------------------------------------------------------------------
@@ -1164,6 +1166,7 @@ ppr_expr (XExpr x) = ppr x
 --EF
 ppr_expr (TArrow   _) = parens arrow
 ppr_expr (TTwiddle _) = parens $ char '~'
+ppr_expr (Star     _) = --Todo
 --EF
 
 
@@ -1273,8 +1276,9 @@ hsExprNeedsParens p = go
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
     go (XExpr{})                      = True
-    go (TArrow{})                    = False
-    go (TTwiddle{})                  = False
+    go (TArrow{})                     = False
+    go (TTwiddle{})                   = False
+    gp (Star{})                       = False
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
