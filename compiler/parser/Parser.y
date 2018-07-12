@@ -2574,7 +2574,7 @@ gen_name  :: { Located FastStrings }  -- Should this be a located faststring? Pr
           | 'unsafe'
           | special_id
           | gen_literal
-          | QCONID               { sL1 $1 Fss  }
+          | QCONID               { sL1 $1  }
           | CONID
           | QCONSYM
           | CONSYM
@@ -2595,6 +2595,7 @@ gen_name  :: { Located FastStrings }  -- Should this be a located faststring? Pr
           | '@'
           | '_'
           | ';'  -- optSemi
+          | '|'
           | special_sym  -- {'!', '.', '*'}
           | -- empty
 
