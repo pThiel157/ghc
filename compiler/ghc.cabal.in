@@ -318,6 +318,7 @@ Library
         HsDecls
         HsDoc
         HsExpr
+        HsTerm
         HsImpExp
         HsLit
         PlaceHolder
