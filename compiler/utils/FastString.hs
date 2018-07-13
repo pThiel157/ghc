@@ -49,7 +49,7 @@ module FastString
 
         -- data FastStrings
         FastStrings,
-        mkFSQual, mkFSUnqual,
+        mkOneFS, mkTwoFS,
 
         -- ** Construction
         fsLit,
@@ -186,13 +186,13 @@ Z-encoding used by the compiler internally.
 
 -- EF
 --  for storing faststrings for terms
-data FastStrings = UnqualFS FastString | QualFS FastString FastString
+data FastStrings = OneFS FastString | TwoFS FastString FastString
 
-mkFSUnqual :: FastString -> FastStrings
-mkFSUnqual fs = UnqualFS fs
+mkOneFS :: FastString -> FastStrings
+mkOneFS fs = OneFS fs
 
-mkFSQual :: (FastString, FastString) -> FastStrings
-mkFSQual (mfs, nfs) = QualFS mfs nfs
+mkTwoFS :: (FastString, FastString) -> FastStrings
+mkTwoFS (mfs, nfs) = TwoFS mfs nfs
 --EF
 
 data FastString = FastString {
