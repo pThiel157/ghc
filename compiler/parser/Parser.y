@@ -2563,9 +2563,25 @@ term      :: { LHsTerm }
           | '(#' terms '#)'
           | '[' terms ']' -- confirm with Richard for '['']'
           | '`' terms '`'
-          | gen_name
+          | '$(' terms ')'
+          | '$$(' terms ')'
+          | '[|' terms '|]'
+          | '[||' terms '||]'
+          | '[t|' terms '|]'  -- inside was originally 'ctype'
+          | '[p|' terms '|]'  -- inside was originally 'infixexp'
+          | '[d|' terms '|]'  -- inside was originally 'cvtopbody'
+          | '(|' terms '|)'
           | 'let' binds 'in' terms
           | 'if' terms 'then' terms 'else' terms
+          | 'if' terms   -- 'if' ifgdpats inside of aexp
+          | '{' terms '}'         -- altslist
+          | '\\' 'lcase' altslist    -- '\\' 'lcase' altslist inside of aexp not sure
+          | '\\' terms
+          | 'case' terms 'of' altslist
+          | 'do' stmtlist
+          | 'mdo' stmtlist
+          | 'proc' terms '->' exp -- should 'exp' for terms
+          | gen_name
 
 {-
 gen_names :: { LHsTerm }
@@ -2573,51 +2589,53 @@ gen_names :: { LHsTerm }
           : gen_names gen_name
 -}
 
-gen_name  :: { Located FastStrings }  -- Should this be a located faststring? Probably not. Probably want located RdrName
-          : 'forall'
-          | 'safe'
-          | 'interruptible'
-          | 'forall'
-          | 'family'
-          | 'role'
-          | 'unsafe'
-          | special_id
-          | gen_literal
-          | QCONID               { sL1 $1  }
-          | CONID
-          | QCONSYM
-          | CONSYM
-          | QVARID
-          | VARID
-          | QVARSYM
-          | VARSYM
-          -- From ipvar:
-          | IPDUPVARID
-          -- From overloaded_label:
-          | LABELVARID
-          ------------
-          | ':'
-          | ','
-          | '..'
-          | '->'
-          | '~'
-          | '@'
-          | '_'
-          | ';'  -- optSemi
-          | '|'
-          | special_sym  -- {'!', '.', '*'}
-          | -- empty
+gen_name  :: { Maybe (Located FastStrings) }
+          : 'unsafe'          { Just (sL1 $1 $! mkOneFS (fsLit "unsafe")) }
+          | 'safe'            { Just (sL1 $1 $! mkOneFS (fsLit "safe")) }
+          | 'interruptible'   { Just (sL1 $1 $! mkOneFS (fsLit "interruptible")) }
+          | 'forall'          { Just (sL1 $1 $! mkOneFS (fsLit "forall")) }
+          | 'family'          { Just (sL1 $1 $! mkOneFS (fsLit "family")) }
+          | 'role'            { Just (sL1 $1 $! mkOneFS (fsLit "role")) }
+          | special_id        { Just (sL1 $1 $! mkOneFS (unLoc $1)) }
+          | gen_literal       { Just $1 }
+          | QCONID            { Just (sL1 $1 $! mkTwoFS (getQCONID $1)) }
+          | CONID             { Just (sL1 $1 $! mkOneFS (getCONID $1)) }
+          | QCONSYM           { Just (sL1 $1 $! mkTwoFS (getQCONSYM $1)) }
+          | CONSYM            { Just (sL1 $1 $! mkOneFS (getCONSYM $1)) }
+          | QVARID            { Just (sL1 $1 $! mkTwoFS (getQVARID $1)) }
+          | VARID             { Just (sL1 $1 $! mkOneFS (getVARID $1)) }
+          | QVARSYM           { Just (sL1 $1 $! mkTwoFS (getQVARSYM $1)) }
+          | VARSYM            { Just (sL1 $1 $! mkOneFS (getVARSYM $1)) }
+          | IPDUPVARID        { Just (sL1 $1 $! mkOneFS (getIPDUPVARID $1)) }      -- from ipvar
+          | LABELVARID        { Just (sL1 $1 $! mkOneFS (getLABELVARID $1)) }      -- from overloaded_label
+          | TH_ID_SPLICE      { Just (sL1 $1 $! mkOneFS (getTH_ID_SPLICE $1)) }    -- from splice_exp
+          | TH_ID_TY_SPLICE   { Just (sL1 $1 $! mkOneFS (getTH_ID_TY_SPLICE $1)) } -- from splice_exp
+          | SIMPLEQUOTE       -- How to encode these? They don't come with a FastString... make one ourselves?
+          | TH_TY_QUOTE       -- multiple fastStrings and a realsrcspan... what to do for right hand side?
+          | TH_QUASIQUOTE
+          | TH_QQUASIQUOTE
+          | ':'               { Just (sL1 $1 $! mkOneFS (fsLit ":")) }
+          | ','               { Just (sL1 $1 $! mkOneFS (fsLit ",")) }
+          | '..'              { Just (sL1 $1 $! mkOneFS (fsLit "..")) }
+          | '->'              { Just (sL1 $1 $! mkOneFS (fsLit "->")) }
+          | '~'               { Just (sL1 $1 $! mkOneFS (fsLit "~")) }
+          | '@'               { Just (sL1 $1 $! mkOneFS (fsLit "@")) }
+          | '_'               { Just (sL1 $1 $! mkOneFS (fsLit "_")) }
+          | ';'               { Just (sL1 $1 $! mkOneFS (fsLit ";")) } -- optSemi
+          | '|'               { Just (sL1 $1 $! mkOneFS (fsLit "|")) }
+          | special_sym       { Just (sL1 $1 $! mkOneFS (unLoc $1)) } -- {special_sym contains '!', '.', '*'}
+          | {- empty -}       { Nothing }
 
-gen_literal :: {  }
+gen_literal :: { Located FastStrings }  -- NOTE: This might be the wrong type here, since getCHARs, getCHAR, etc don't seem to return faststrings
           -- From literal in aexp2:
-          : CHAR
-          | STRING
-          | PRIMINTEGER
-          | PRIMWORD
-          | PRIMCHAR
-          | PRIMSTRING
-          | PRIMFLOAT
-          | PRIMDOUBLE
+          : CHAR              { sL1 $1 $! mkTwoFS ((getCHARs $1), (getCHAR $1)) }
+          | STRING            { sL1 $1 $! mkTwoFS ((getSTRINGs $1), (getSTRING $1)) }
+          | PRIMINTEGER       { sL1 $1 $! mkTwoFS ((getPRIMINTEGERs $1), (getPRIMINTEGER $1)) }
+          | PRIMWORD          { sL1 $1 $! mkTwoFS ((getPRIMWORDs $1), (getPRIMWORD $1)) }
+          | PRIMCHAR          { sL1 $1 $! mkTwoFS ((getPRIMCHARs $1), (getPRIMCHAR $1)) }
+          | PRIMSTRING        { sL1 $1 $! mkTwoFS ((getPRIMSTRINGs $1), (getPRIMSTRING $1)) }
+          | PRIMFLOAT         { sL1 $1 $! mkOneFS (getPRIMFLOAT $1) }
+          | PRIMDOUBLE        { sL1 $1 $! mkTwoFS (getPRIMDOUBLE $1) }
           -- From the main body of aexp2 (should these be here? What's the difference between a PRIMINTEGER and a regular INTEGER)
           | INTEGER
           | RATIONAL
