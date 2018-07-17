@@ -63,14 +63,101 @@ import qualified Language.Haskell.TH as TH (Q)
 
 -- EF
 --  for storing information for gen_names
-data GenData = OneFS FastString | TwoFS FastString FastString
-              | OneHsLit (HsLit GhcPs) | OneHsOverLit (HsOverLit GhsPs)
-              | OneHsSplice (HsSplice GhcPs)
-              -- | OneChar Char | OneSRT SourceText
-              -- | OneInt Integer | OneBString ByteString
-              -- | OneFracLit FractionalLit
+data GenData = UnsafeData FastString
+             | SafeData FastString
+             | InterruptibleData FastString
+             | ForallData FastString
+             | FamilyData FastString
+             | RoleData FastString
+             | SpecialIdData FastString
+             | LiteralData (HsLit GhcPs)
+             | IntegerData (HsOverLit GhsPs)
+             | RationalData (HsOverLit GhsPs)
+             | QConidData (FastString, FastString)
+             | ConidData FastString
+             | QConsymData (FastString, FastString)
+             | ConsymData FastString
+             | QVaridData (FastString, FastString)
+             | VaridData FastString
+             | QVarsymData (FastString, FastString)
+             | VarsymData FastString
+             | IPDupVaridData FastString
+             | LabelVaridData FastString
+             | ThIdSpliceData FastString
+             | ThIdTySpliceData FastString
+             | QuasiquoteData (HsSplice GhsPs)
+             | ColonData FastString
+             | ArrowData FastString
+             | TwiddleData FastString
+             | SpecialSymData FastString
 
+             --  OneFS FastString
+             -- | TwoFS FastString FastString
+             -- | OneHsLit (HsLit GhcPs)
+             -- | OneHsOverLit (HsOverLit GhsPs)
+             -- | OneHsSplice (HsSplice GhcPs)
+             --  -- | OneChar Char
+             --  -- | OneSRT SourceText
+             --  -- | OneInt Integer
+             --  -- | OneBString ByteString
+             --  -- | OneFracLit FractionalLit
+mkUnsafeData        :: FastString -> GenData
+mkSafeData          :: FastString -> GenData
+mkInterruptibleData :: FastString -> GenData
+mkForallData        :: FastString -> GenData
+mkFamilyData        :: FastString -> GenData
+mkRoleData          :: FastString -> GenData
+mkSpecialIdData     :: FastString -> GenData
+mkLiteralData       :: (HsLit GhcPs) -> GenData
+mkIntegerData       :: (HsOverLit GhsPs) -> GenData
+mkRationalData      :: (HsOverLit GhsPs) -> GenData
+mkQConidData        :: (FastString, FastString) -> GenData
+mkConidData         :: FastString -> GenData
+mkQConsymData       :: (FastString, FastString) -> Gendata
+mkConsymData        :: FastString -> Gendata
+mkQVaridData        ::  (FastString, FastString) -> GenData
+mkVaridData         :: FastString -> Gendata
+mkQVarsymData       :: (FastString, FastString) -> Gendata
+mkVarsymData        :: FastString -> Gendata
+mkIPDupVaridData    :: FastString -> Gendata
+mkLabelVaridData    :: FastString -> GenData
+mkThIdSpliceData    :: FastString -> GenData
+mkThIdTySpliceData  :: FastString -> GenData
+mkQuasiquoteData    :: (HsSplice GhsPs) -> GenData
+mkColonData         :: FastString -> GenData
+mkArrowData         :: FastString -> GenData
+mkTwiddleData       :: FastString -> GenData
+mkSpecialSymData    :: FastString -> GenData
 
+mkUnsafeData        = UnsafeData
+mkSafeData          = SafeData
+mkInterruptibleData = InterruptibleData
+mkForallData        = ForallData
+mkFamilyData        = FamilyData
+mkRoleData          = RoleData
+mkSpecialIdData     = SpecialIdData
+mkLiteralData       = LiteralData
+mkIntegerData       = IntegerData
+mkRationalData      = RationalData
+mkQConidData        = QConidData
+mkConidData         = ConidData
+mkQConsymData       = QConsymData
+mkConsymData        = ConsymData
+mkQVaridData        = QVaridData
+mkVaridData         = VaridData
+mkQVarsymData       = QVarsymData
+mkVarsymData        = VarsymData
+mkIPDupVaridData    = IPDupVaridData
+mkLabelVarid        = LabelVaridData
+mkThIdSpliceData    = ThIdSpliceData
+mkThIdTySpliceData  = ThIdTySpliceData
+mkQuasiquoteData    = QuasiquoteData
+mkColonData         = ColonData
+mkArrowData         = ArrowData
+mkTwiddleData       = TwiddleData
+mkSpecialSymData    = SpecialSymData
+
+{-
 mkOneFS :: FastString -> GenData
 mkOneFS fs = OneFS fs
 
@@ -86,7 +173,7 @@ mkOneHsOverLit hol = OneHsOverLit hol
 mkOneHsSplice :: (HsSplice GhsPs) -> GenData
 mkOneHsSplice hsl = OneHsSplice hsl
 
-{-
+
 -- for getCHAR
 mkOneChar :: Char -> GenData
 mkOneChar c = OneChar c
