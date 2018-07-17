@@ -2621,33 +2621,33 @@ gen_name :: { LHsTerm }
 -}
 
 gen_name  :: { Maybe (Located GenData) }
-          : 'unsafe'          { Just (sL1 $1 $! mkOneFS (fsLit "unsafe")) }
-          | 'safe'            { Just (sL1 $1 $! mkOneFS (fsLit "safe")) }
-          | 'interruptible'   { Just (sL1 $1 $! mkOneFS (fsLit "interruptible")) }
-          | 'forall'          { Just (sL1 $1 $! mkOneFS (fsLit "forall")) }
-          | 'family'          { Just (sL1 $1 $! mkOneFS (fsLit "family")) }
-          | 'role'            { Just (sL1 $1 $! mkOneFS (fsLit "role")) }
-          | special_id        { Just (sL1 $1 $! mkOneFS (unLoc $1)) }
-          | literal           { Just (sL1 $1 $! mkOneHsLit (unLoc $1)) }
-          | INTEGER           { Just (sL1 $1 $! mkOneHsOverLit (mkHsIntegral   (getINTEGER $1)) }
-          | RATIONAL          { Just (sL1 $1 $! mkOneHsOverLit (mkHsFractional (getINTEGER $1)) }
-          | QCONID            { Just (sL1 $1 $! mkTwoFS (getQCONID $1)) }
-          | CONID             { Just (sL1 $1 $! mkOneFS (getCONID $1)) }
-          | QCONSYM           { Just (sL1 $1 $! mkTwoFS (getQCONSYM $1)) }
-          | CONSYM            { Just (sL1 $1 $! mkOneFS (getCONSYM $1)) }
-          | QVARID            { Just (sL1 $1 $! mkTwoFS (getQVARID $1)) }
-          | VARID             { Just (sL1 $1 $! mkOneFS (getVARID $1)) }
-          | QVARSYM           { Just (sL1 $1 $! mkTwoFS (getQVARSYM $1)) }
-          | VARSYM            { Just (sL1 $1 $! mkOneFS (getVARSYM $1)) }
-          | IPDUPVARID        { Just (sL1 $1 $! mkOneFS (getIPDUPVARID $1)) }      -- from ipvar
-          | LABELVARID        { Just (sL1 $1 $! mkOneFS (getLABELVARID $1)) }      -- from overloaded_label
-          | TH_ID_SPLICE      { Just (sL1 $1 $! mkOneFS (getTH_ID_SPLICE $1)) }    -- from splice_exp
-          | TH_ID_TY_SPLICE   { Just (sL1 $1 $! mkOneFS (getTH_ID_TY_SPLICE $1)) } -- from splice_exp
-          | quasiquote        { Just (sL1 $1 $! mkOneHsSplice (unLoc $1)) }
-          | ':'               { Just (sL1 $1 $! mkOneFS (fsLit ":")) }
-          | '->'              { Just (sL1 $1 $! mkOneFS (fsLit "->")) }
-          | '~'               { Just (sL1 $1 $! mkOneFS (fsLit "~")) }
-          | special_sym       { Just (sL1 $1 $! mkOneFS (unLoc $1)) } -- {special_sym contains '!', '.', '*'}
+          : 'unsafe'          { Just (sL1 $1 $! mkUnsafeData (fsLit "unsafe")) }
+          | 'safe'            { Just (sL1 $1 $! mkSafeData (fsLit "safe")) }
+          | 'interruptible'   { Just (sL1 $1 $! mkInterruptibleData (fsLit "interruptible")) }
+          | 'forall'          { Just (sL1 $1 $! mkForallData (fsLit "forall")) }
+          | 'family'          { Just (sL1 $1 $! mkFamilyData (fsLit "family")) }
+          | 'role'            { Just (sL1 $1 $! mkRoleData (fsLit "role")) }
+          | special_id        { Just (sL1 $1 $! mkSpecialIdData (unLoc $1)) }
+          | literal           { Just (sL1 $1 $! mkLiteralData (unLoc $1)) }
+          | INTEGER           { Just (sL1 $1 $! mkIntegerData (mkHsIntegral   (getINTEGER $1)) }
+          | RATIONAL          { Just (sL1 $1 $! mkRationalData (mkHsFractional (getINTEGER $1)) }
+          | QCONID            { Just (sL1 $1 $! mkQConidData (getQCONID $1)) }
+          | CONID             { Just (sL1 $1 $! mkConidData (getCONID $1)) }
+          | QCONSYM           { Just (sL1 $1 $! mkQConsymData (getQCONSYM $1)) }
+          | CONSYM            { Just (sL1 $1 $! mkConsymData (getCONSYM $1)) }
+          | QVARID            { Just (sL1 $1 $! mkQVaridData (getQVARID $1)) }
+          | VARID             { Just (sL1 $1 $! mkVaridData (getVARID $1)) }
+          | QVARSYM           { Just (sL1 $1 $! mkQVarsymData (getQVARSYM $1)) }
+          | VARSYM            { Just (sL1 $1 $! mkVarsymData (getVARSYM $1)) }
+          | IPDUPVARID        { Just (sL1 $1 $! mkIPDupVaridData (getIPDUPVARID $1)) }      -- from ipvar
+          | LABELVARID        { Just (sL1 $1 $! mkLabelVaridData (getLABELVARID $1)) }      -- from overloaded_label
+          | TH_ID_SPLICE      { Just (sL1 $1 $! mkThIdSpliceData (getTH_ID_SPLICE $1)) }    -- from splice_exp
+          | TH_ID_TY_SPLICE   { Just (sL1 $1 $! mkThIdTySpliceData (getTH_ID_TY_SPLICE $1)) } -- from splice_exp
+          | quasiquote        { Just (sL1 $1 $! mkQuasiquoteData (unLoc $1)) }
+          | ':'               { Just (sL1 $1 $! mkColonData (fsLit ":")) }
+          | '->'              { Just (sL1 $1 $! mkArrowData (fsLit "->")) }
+          | '~'               { Just (sL1 $1 $! mkTwiddleData (fsLit "~")) }
+          | special_sym       { Just (sL1 $1 $! mkSpecialSymData (unLoc $1)) } -- {special_sym contains '!', '.', '*'}
           | {- empty -}       { Nothing }
 
 tup_terms :: { }
@@ -3821,7 +3821,11 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 
 
 check_aexp2 :: LHsTerms -> LHsExpr GhcPs
-check_aexp2 (x : xs)
+check_aexp2 (x@(L sp (HsGenName name)) : xs)
+  = case name of
+      Just (OneHsOverLit hsl) -> case gdata of
+                      Hs
+      Nothing ->
 
 
 
