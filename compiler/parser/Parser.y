@@ -37,6 +37,7 @@ import Control.Applicative ((<$))
 
 -- compiler/hsSyn
 import HsSyn
+import HsTerm
 
 -- compiler/main
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
@@ -2554,42 +2555,65 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 , getINTEGERs $9
                                                 )))
                                          }
-terms     :: { LHsTerm }  -- what should we do on the right hand side for this???
+terms     :: { LHsTerms }  -- what should we do on the right hand side for this???
           : term
           | terms term
 
+-- covers `exp`, `atype`, `aexp`, `aexp1`, `aexp2`    -- NOTE:  probably needs to cover ctype as well, possibly also texp
 term      :: { LHsTerm }
           : '(' terms ')'
+          | '(' tup_terms ')'
           | '(#' terms '#)'
-          | '[' terms ']' -- confirm with Richard for '['']'
+          | '(#' tup_terms '#)'
+          | '[' terms ']'
           | '`' terms '`'
-          | '$(' terms ')'
-          | '$$(' terms ')'
-          | '[|' terms '|]'
-          | '[||' terms '||]'
-          | '[t|' terms '|]'  -- inside was originally 'ctype'
-          | '[p|' terms '|]'  -- inside was originally 'infixexp'
-          | '[d|' terms '|]'  -- inside was originally 'cvtopbody'
-          | '(|' terms '|)'
-          | 'let' binds 'in' terms
-          | 'if' terms 'then' terms 'else' terms
-          | 'if' terms   -- 'if' ifgdpats inside of aexp
-          | '{' terms '}'         -- altslist
+          | infixexp '-<' exp
+          | infixexp '>-' exp
+          | infixexp '-<<' exp
+          | infixexp '>>-' exp
+          | scc_annot exp
+          | hpc_annot exp
+          | '{-# CORE' STRING '#-}' exp
+          | 'static' aexp
+          | terms TYPEAPP atype
+          | '$(' exp ')'
+          | '$$(' exp ')'
+          | '[|' exp '|]'
+          | '[||' exp '||]'
+          | '[t|' ctype '|]'
+          | '[p|' infixexp '|]'
+          | '[d|' cvtopbody '|]'
+          | '(|' aexp2 cmdargs '|)'
+          | '{' fbinds '}'    -- for fbinds inside of aexp1
+          | 'let' binds 'in' exp
+          | 'if' exp optSemi 'then' exp optSemi 'else' exp       --  Run checkDoAndIfThenElse here, and then it's ok to throw away the semicolon information
+          | 'if' ifgdpats -- `ifgdpats` contains `binds`   -- 'if' ifgdpats inside of aexp
           | '\\' 'lcase' altslist    -- '\\' 'lcase' altslist inside of aexp not sure
-          | '\\' terms
-          | 'case' terms 'of' altslist
+          | '\\' apat apats '->' exp
+          | terms '::' terms  -- type on right
+          | 'case' exp 'of' altslist  -- exps
           | 'do' stmtlist
           | 'mdo' stmtlist
-          | 'proc' terms '->' exp -- should 'exp' for terms
+          | 'proc' aexp '->' exp
+          | SIMPLEQUOTE terms       -- How to encode these? They don't come with a FastString... make one ourselves?  -- generalized structure
+          | TH_TY_QUOTE terms       -- multiple fastStrings and a realsrcspan... what to do for right hand side?      -- generalized structure
+          | strict_mark terms    -- pattern or type
+          | qvar '@' aexp
+          | '_'
+          | list                 -- Is this right?
+          | context '=>' ctype
           | gen_name
+          -- need to add case: 'name' '@' pattern
+          -- '_', ';', '|', '..'
 
 {-
-gen_names :: { LHsTerm }
-          : gen_name
-          : gen_names gen_name
+gen_name :: { LHsTerm }
+          : SIMPLEQUOTE gen_name       -- How to encode these? They don't come with a FastString... make one ourselves?
+          | TH_TY_QUOTE gen_name       -- multiple fastStrings and a realsrcspan... what to do for right hand side?
+          | gen_name2
 -}
 
-gen_name  :: { Maybe (Located FastStrings) }
+gen_name  :: { Maybe (Located GenData) }
           : 'unsafe'          { Just (sL1 $1 $! mkOneFS (fsLit "unsafe")) }
           | 'safe'            { Just (sL1 $1 $! mkOneFS (fsLit "safe")) }
           | 'interruptible'   { Just (sL1 $1 $! mkOneFS (fsLit "interruptible")) }
@@ -2597,7 +2621,9 @@ gen_name  :: { Maybe (Located FastStrings) }
           | 'family'          { Just (sL1 $1 $! mkOneFS (fsLit "family")) }
           | 'role'            { Just (sL1 $1 $! mkOneFS (fsLit "role")) }
           | special_id        { Just (sL1 $1 $! mkOneFS (unLoc $1)) }
-          | gen_literal       { Just $1 }
+          | literal           { Just (sL1 $1 $! mkOneHsLit (unLoc $1)) }
+          | INTEGER           { Just (sL1 $1 $! mkOneHsOverLit (mkHsIntegral   (getINTEGER $1)) }
+          | RATIONAL          { Just (sL1 $1 $! mkOneHsOverLit (mkHsFractional (getINTEGER $1)) }
           | QCONID            { Just (sL1 $1 $! mkTwoFS (getQCONID $1)) }
           | CONID             { Just (sL1 $1 $! mkOneFS (getCONID $1)) }
           | QCONSYM           { Just (sL1 $1 $! mkTwoFS (getQCONSYM $1)) }
@@ -2610,35 +2636,32 @@ gen_name  :: { Maybe (Located FastStrings) }
           | LABELVARID        { Just (sL1 $1 $! mkOneFS (getLABELVARID $1)) }      -- from overloaded_label
           | TH_ID_SPLICE      { Just (sL1 $1 $! mkOneFS (getTH_ID_SPLICE $1)) }    -- from splice_exp
           | TH_ID_TY_SPLICE   { Just (sL1 $1 $! mkOneFS (getTH_ID_TY_SPLICE $1)) } -- from splice_exp
-          | SIMPLEQUOTE       -- How to encode these? They don't come with a FastString... make one ourselves?
-          | TH_TY_QUOTE       -- multiple fastStrings and a realsrcspan... what to do for right hand side?
-          | TH_QUASIQUOTE
-          | TH_QQUASIQUOTE
+          | quasiquote        { Just (sL1 $1 $! mkOneHsSplice (unLoc $1)) }
           | ':'               { Just (sL1 $1 $! mkOneFS (fsLit ":")) }
-          | ','               { Just (sL1 $1 $! mkOneFS (fsLit ",")) }
-          | '..'              { Just (sL1 $1 $! mkOneFS (fsLit "..")) }
           | '->'              { Just (sL1 $1 $! mkOneFS (fsLit "->")) }
           | '~'               { Just (sL1 $1 $! mkOneFS (fsLit "~")) }
-          | '@'               { Just (sL1 $1 $! mkOneFS (fsLit "@")) }
-          | '_'               { Just (sL1 $1 $! mkOneFS (fsLit "_")) }
-          | ';'               { Just (sL1 $1 $! mkOneFS (fsLit ";")) } -- optSemi
-          | '|'               { Just (sL1 $1 $! mkOneFS (fsLit "|")) }
           | special_sym       { Just (sL1 $1 $! mkOneFS (unLoc $1)) } -- {special_sym contains '!', '.', '*'}
           | {- empty -}       { Nothing }
 
-gen_literal :: { Located FastStrings }  -- NOTE: This might be the wrong type here, since getCHARs, getCHAR, etc don't seem to return faststrings
-          -- From literal in aexp2:
-          : CHAR              { sL1 $1 $! mkTwoFS ((getCHARs $1), (getCHAR $1)) }
-          | STRING            { sL1 $1 $! mkTwoFS ((getSTRINGs $1), (getSTRING $1)) }
-          | PRIMINTEGER       { sL1 $1 $! mkTwoFS ((getPRIMINTEGERs $1), (getPRIMINTEGER $1)) }
-          | PRIMWORD          { sL1 $1 $! mkTwoFS ((getPRIMWORDs $1), (getPRIMWORD $1)) }
-          | PRIMCHAR          { sL1 $1 $! mkTwoFS ((getPRIMCHARs $1), (getPRIMCHAR $1)) }
-          | PRIMSTRING        { sL1 $1 $! mkTwoFS ((getPRIMSTRINGs $1), (getPRIMSTRING $1)) }
-          | PRIMFLOAT         { sL1 $1 $! mkOneFS (getPRIMFLOAT $1) }
-          | PRIMDOUBLE        { sL1 $1 $! mkTwoFS (getPRIMDOUBLE $1) }
-          -- From the main body of aexp2 (should these be here? What's the difference between a PRIMINTEGER and a regular INTEGER)
-          | INTEGER
-          | RATIONAL
+tup_terms :: { }
+          : terms commas_tup_tail_terms
+          | terms bars
+          | bar_terms2     -- This needs to be added to cover tuples in types
+          | commas tup_tail_terms
+          | bars terms bars0
+
+commas_tup_tail_terms :: { }
+          : commas tup_tail_terms
+
+tup_tail_terms :: { }
+          : terms commas_tup_tail_terms
+          | terms
+          | {- empty -}      -- We might not need this case since terms can also boil down to {- empty -}
+
+bar_terms2 :: { }
+          : terms '|' terms
+          | terms '|' bar_terms2
+
 
 
 
@@ -3789,6 +3812,9 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 -- Old version for '(' ':' ')' case, now handled above
 --loc_rdr_exp_to_type c@(L _ (Exact _)) = c
 
+
+check_aexp2 :: LHsTerm -> LHsExpr GhcPs
+check_aexp2
 
 
 

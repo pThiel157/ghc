@@ -47,9 +47,9 @@ module FastString
         -- * FastStrings
         FastString(..),     -- not abstract, for now.
 
-        -- data FastStrings
-        FastStrings,
-        mkOneFS, mkTwoFS,
+        -- -- data FastStrings
+        -- FastStrings,
+        -- mkOneFS, mkTwoFS,
 
         -- ** Construction
         fsLit,
@@ -184,16 +184,17 @@ Z-encoding used by the compiler internally.
 'FastString's support a memoized conversion to the Z-encoding via zEncodeFS.
 -}
 
--- EF
---  for storing faststrings for terms
-data FastStrings = OneFS FastString | TwoFS FastString FastString
-
-mkOneFS :: FastString -> FastStrings
-mkOneFS fs = OneFS fs
-
-mkTwoFS :: (FastString, FastString) -> FastStrings
-mkTwoFS (mfs, nfs) = TwoFS mfs nfs
---EF
+-- -- EF
+-- --  for storing faststrings for terms
+-- data GenData = OneFS FastString | TwoFS FastString FastString |
+--
+--
+-- mkOneFS :: FastString -> FastStrings
+-- mkOneFS fs = OneFS fs
+--
+-- mkTwoFS :: (FastString, FastString) -> FastStrings
+-- mkTwoFS (mfs, nfs) = TwoFS mfs nfs
+-- --EF
 
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
