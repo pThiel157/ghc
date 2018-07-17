@@ -2556,53 +2556,60 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 )))
                                          }
 terms     :: { LHsTerms }  -- what should we do on the right hand side for this???
-          : term
-          | terms term
+          : term                          { [$1] }
+          | terms term                    { $2 ++ $1 }
 
--- covers `exp`, `atype`, `aexp`, `aexp1`, `aexp2`    -- NOTE:  probably needs to cover ctype as well, possibly also texp
+-- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
 term      :: { LHsTerm }
-          : '(' terms ')'
-          | '(' tup_terms ')'
-          | '(#' terms '#)'
-          | '(#' tup_terms '#)'
-          | '[' terms ']'
-          | '`' terms '`'
-          | infixexp '-<' exp
-          | infixexp '>-' exp
-          | infixexp '-<<' exp
-          | infixexp '>>-' exp
-          | scc_annot exp
-          | hpc_annot exp
-          | '{-# CORE' STRING '#-}' exp
-          | 'static' aexp
-          | terms TYPEAPP atype
-          | '$(' exp ')'
-          | '$$(' exp ')'
-          | '[|' exp '|]'
-          | '[||' exp '||]'
-          | '[t|' ctype '|]'
-          | '[p|' infixexp '|]'
-          | '[d|' cvtopbody '|]'
-          | '(|' aexp2 cmdargs '|)'
-          | '{' fbinds '}'    -- for fbinds inside of aexp1
-          | 'let' binds 'in' exp
-          | 'if' exp optSemi 'then' exp optSemi 'else' exp       --  Run checkDoAndIfThenElse here, and then it's ok to throw away the semicolon information
-          | 'if' ifgdpats -- `ifgdpats` contains `binds`   -- 'if' ifgdpats inside of aexp
-          | '\\' 'lcase' altslist    -- '\\' 'lcase' altslist inside of aexp not sure
-          | '\\' apat apats '->' exp
-          | terms '::' terms  -- type on right
-          | 'case' exp 'of' altslist  -- exps
-          | 'do' stmtlist
-          | 'mdo' stmtlist
-          | 'proc' aexp '->' exp
-          | SIMPLEQUOTE terms       -- How to encode these? They don't come with a FastString... make one ourselves?  -- generalized structure
-          | TH_TY_QUOTE terms       -- multiple fastStrings and a realsrcspan... what to do for right hand side?      -- generalized structure
-          | strict_mark terms    -- pattern or type
-          | qvar '@' aexp
-          | '_'
-          | list                 -- Is this right?
-          | context '=>' ctype
-          | gen_name
+          : '(' terms ')'                 { sLL $1 $> $ HsParTerm $2 }
+          | '(' tup_terms ')'             --TODO
+          | '(#' terms '#)'               { sLL $1 $> $ HsBoxParTerm $2 }
+          | '(#' tup_terms '#)'           --TODO
+          | '[' terms ']'                 { sLL $1 $> $ HsBracketTerm $2 }
+          | '`' terms '`'                 { sLL $1 $> $ HsBacktickTerm $2 }
+          | infixexp '-<' exp             { sLL $1 $> $ HsArrAppTerm $1 $3 HsFirstOrderApp True }
+          | infixexp '>-' exp             { sLL $1 $> $ HsArrAppTerm $3 $1 HsFirstOrderApp False }
+          | infixexp '-<<' exp            { sLL $1 $> $ HsArrAppTerm $1 $3 HsHigherOrderApp True }
+          | infixexp '>>-' exp            { sLL $1 $> $ HsArrAppTerm $3 $1 HsHigherOrderApp False }
+          | scc_annot exp                 { sLL $1 $> $ HsSccAnnTerm (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2 }
+          | hpc_annot exp                 { sLL $1 $> $ HsTickPragmaTerm (snd $ fst $ fst $ unLoc $1)
+                                                                         (snd $ fst $ unLoc $1)
+                                                                         (snd $ unLoc $1)
+                                                                         $2 }
+          | '{-# CORE' STRING '#-}' exp   { sLL $1 $> $ HsCoreAnnTerm (getCORE_PRAGs $1) (getStringLiteral $2) $4 }
+          | 'static' aexp                 { sLL $1 $> $ HsStaticTerm $2 }
+          | terms TYPEAPP atype           { sLL $1 $> $ HsTypeAppTerm $1 $3 }
+          | '$(' exp ')'                  { sLL $1 $> $ HsDollarParenTerm $2 }
+          | '$$(' exp ')'                 { sLL $1 $> $ HsDoubleDollarParenTerm $2 }
+          | '[|' exp '|]'                 { sLL $1 $> $ HsExqQuoteterm $2}
+          | '[||' exp '||]'               { sLL $1 $> $ HsTExpQuoteTerm $2 }
+          | '[t|' ctype '|]'              { sLL $1 $> $ HsTypQuoteTerm $2 }
+          | '[p|' infixexp '|]'           { sLL $1 $> $ HsPatQuoteTerm $2 }
+          | '[d|' cvtopbody '|]'          { sLL $1 $> $ HsDecQuoteTerm $2 }
+          | '(|' aexp2 cmdargs '|)'       { sLL $1 $> $ HsParenBarTerm $2 $3 }
+          | '{' fbinds '}'                { sLL $1 $> $ HsFBindsTerm $2 }     -- for fbinds inside of aexp1
+          | 'let' binds 'in' exp          { sLL $1 $> $ HsLetTerm $2 $4 }
+          | 'if' exp optSemi 'then' exp optSemi 'else' exp
+                                          {% checkDoAndIfThenElse $2 (snd $3) $5 (snd $6) $8 >>
+                                             return (sLL $1 $> $ HsIfThenElseTerm $2 $5 $8) }
+          | 'if' ifgdpats                 { sLL $1 $> $ HsOnlyIfTerm $2 } -- `ifgdpats` contains `binds`   -- 'if' ifgdpats inside of aexp
+          | '\\' 'lcase' altslist         { sLL $1 $> $ HsLcaseTerm $3 }
+          | '\\' apat apats '->' exp      { sLL $1 $> $ HsApatsArrowTerm $2 $3 $5 }
+          | terms '::' ctype              { sLL $1 $> $ HsDconTerm $1 $3 }    -- type on right
+          | 'case' exp 'of' altslist      { sLL $1 $> $ HsCaseTerm $2 $4 }
+          | 'do' stmtlist                 { sLL $1 $> $ HsDoTerm $2 }
+          | 'mdo' stmtlist                { sLL $1 $> $ HsMdoTerm $2 }
+          | 'proc' aexp '->' exp          { sLL $1 $> $ HsProcTerm $2 $4 }
+          | SIMPLEQUOTE terms             { sLL $1 $> $ HsSimplequoteTerm $2 }       -- How to encode these? They don't come with a FastString... make one ourselves?  -- generalized structure
+          | TH_TY_QUOTE terms             { sLL $1 $> $ HsThTyQuoteTerm $2 } -- multiple fastStrings and a realsrcspan... what to do for right hand side?      -- generalized structure
+          | strict_mark terms             -- pattern or type
+          | unpackedness atype --type
+          | unpackedness strictness atype
+          | qvar '@' aexp                 { sLL $1 $> $ HsAtTerm $1 $3 }
+          | '_'                           { sL1 $1 $ HsUnderscoreTerm }
+          | list                          { sL1 $1 $ HsListTerm $1 }-- Is this right?
+          | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
+          | gen_name                      { sL1 $1 $ HsGenName $1 }
           -- need to add case: 'name' '@' pattern
           -- '_', ';', '|', '..'
 
@@ -2650,15 +2657,15 @@ tup_terms :: { }
           | commas tup_tail_terms
           | bars terms bars0
 
-commas_tup_tail_terms :: { }
+commas_tup_tail_terms :: {  }
           : commas tup_tail_terms
 
-tup_tail_terms :: { }
+tup_tail_terms :: {  }
           : terms commas_tup_tail_terms
           | terms
           | {- empty -}      -- We might not need this case since terms can also boil down to {- empty -}
 
-bar_terms2 :: { }
+bar_terms2 :: { [LHsTerm] }
           : terms '|' terms
           | terms '|' bar_terms2
 
@@ -3813,8 +3820,8 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 --loc_rdr_exp_to_type c@(L _ (Exact _)) = c
 
 
-check_aexp2 :: LHsTerm -> LHsExpr GhcPs
-check_aexp2
+check_aexp2 :: LHsTerms -> LHsExpr GhcPs
+check_aexp2 (x : xs)
 
 
 
