@@ -509,8 +509,11 @@ data HsTerm
           (LHsType GhcPs)
   | HsGenName
           (Located GenData)
+  | HsTupTerm
+          (Located HsTupTerm)
 
-
+data HsTupTerm
+  = 
 
 
 {-
