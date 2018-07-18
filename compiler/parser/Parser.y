@@ -2557,7 +2557,7 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                          }
 terms     :: { LHsTerms }  -- what should we do on the right hand side for this???
           : term                          { [$1] }
-          | terms term                    { $2 ++ $1 }
+          | terms term                    { $1 ++ $2 }
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
 term      :: { LHsTerm }
@@ -2609,7 +2609,9 @@ term      :: { LHsTerm }
           | '_'                           { sL1 $1 $ HsUnderscoreTerm }
           | list                          { sL1 $1 $ HsListTerm $1 }-- Is this right?
           | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
-          | gen_name                      { sL1 $1 $ HsGenName $1 }
+          | gen_name                      { sL1 (loc $1) $ HsGenName $1
+                                            where loc x = case x of
+                                                          Nothing -> }
           -- need to add case: 'name' '@' pattern
           -- '_', ';', '|', '..'
 

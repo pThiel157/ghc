@@ -508,7 +508,7 @@ data HsTerm
           (LHsContext GhcPs)
           (LHsType GhcPs)
   | HsGenName
-          (Maybe (Located GenData))
+          (Located GenData)
 
 
 
