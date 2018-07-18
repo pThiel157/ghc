@@ -2556,8 +2556,9 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 )))
                                          }
 terms     :: { LHsTerms }  -- what should we do on the right hand side for this???
-          : term                          { [$1] }
-          | terms term                    { $2 ++ $1 }
+          :-- term                          { [$1] }
+          | term terms                    { $1 : $2 }
+          | {- empty -}                   { [] }
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
 term      :: { LHsTerm }
@@ -2620,35 +2621,34 @@ gen_name :: { LHsTerm }
           | gen_name2
 -}
 
-gen_name  :: { Maybe (Located GenData) }
-          : 'unsafe'          { Just (sL1 $1 $! mkUnsafeData (fsLit "unsafe")) }
-          | 'safe'            { Just (sL1 $1 $! mkSafeData (fsLit "safe")) }
-          | 'interruptible'   { Just (sL1 $1 $! mkInterruptibleData (fsLit "interruptible")) }
-          | 'forall'          { Just (sL1 $1 $! mkForallData (fsLit "forall")) }
-          | 'family'          { Just (sL1 $1 $! mkFamilyData (fsLit "family")) }
-          | 'role'            { Just (sL1 $1 $! mkRoleData (fsLit "role")) }
-          | special_id        { Just (sL1 $1 $! mkSpecialIdData (unLoc $1)) }
-          | literal           { Just (sL1 $1 $! mkLiteralData (unLoc $1)) }
-          | INTEGER           { Just (sL1 $1 $! mkIntegerData (mkHsIntegral   (getINTEGER $1)) }
-          | RATIONAL          { Just (sL1 $1 $! mkRationalData (mkHsFractional (getINTEGER $1)) }
-          | QCONID            { Just (sL1 $1 $! mkQConidData (getQCONID $1)) }
-          | CONID             { Just (sL1 $1 $! mkConidData (getCONID $1)) }
-          | QCONSYM           { Just (sL1 $1 $! mkQConsymData (getQCONSYM $1)) }
-          | CONSYM            { Just (sL1 $1 $! mkConsymData (getCONSYM $1)) }
-          | QVARID            { Just (sL1 $1 $! mkQVaridData (getQVARID $1)) }
-          | VARID             { Just (sL1 $1 $! mkVaridData (getVARID $1)) }
-          | QVARSYM           { Just (sL1 $1 $! mkQVarsymData (getQVARSYM $1)) }
-          | VARSYM            { Just (sL1 $1 $! mkVarsymData (getVARSYM $1)) }
-          | IPDUPVARID        { Just (sL1 $1 $! mkIPDupVaridData (getIPDUPVARID $1)) }      -- from ipvar
-          | LABELVARID        { Just (sL1 $1 $! mkLabelVaridData (getLABELVARID $1)) }      -- from overloaded_label
-          | TH_ID_SPLICE      { Just (sL1 $1 $! mkThIdSpliceData (getTH_ID_SPLICE $1)) }    -- from splice_exp
-          | TH_ID_TY_SPLICE   { Just (sL1 $1 $! mkThIdTySpliceData (getTH_ID_TY_SPLICE $1)) } -- from splice_exp
-          | quasiquote        { Just (sL1 $1 $! mkQuasiquoteData (unLoc $1)) }
-          | ':'               { Just (sL1 $1 $! mkColonData (fsLit ":")) }
-          | '->'              { Just (sL1 $1 $! mkArrowData (fsLit "->")) }
-          | '~'               { Just (sL1 $1 $! mkTwiddleData (fsLit "~")) }
-          | special_sym       { Just (sL1 $1 $! mkSpecialSymData (unLoc $1)) } -- {special_sym contains '!', '.', '*'}
-          | {- empty -}       { Nothing }
+gen_name  :: { Located GenData }
+          : 'unsafe'          { sL1 $1 $! mkUnsafeData (fsLit "unsafe") }
+          | 'safe'            { sL1 $1 $! mkSafeData (fsLit "safe") }
+          | 'interruptible'   { sL1 $1 $! mkInterruptibleData (fsLit "interruptible") }
+          | 'forall'          { sL1 $1 $! mkForallData (fsLit "forall") }
+          | 'family'          { sL1 $1 $! mkFamilyData (fsLit "family") }
+          | 'role'            { sL1 $1 $! mkRoleData (fsLit "role") }
+          | special_id        { sL1 $1 $! mkSpecialIdData (unLoc $1) }
+          | literal           { sL1 $1 $! mkLiteralData (unLoc $1) }
+          | INTEGER           { sL1 $1 $! mkIntegerData (mkHsIntegral   (getINTEGER $1) }
+          | RATIONAL          { sL1 $1 $! mkRationalData (mkHsFractional (getINTEGER $1) }
+          | QCONID            { sL1 $1 $! mkQConidData (getQCONID $1) }
+          | CONID             { sL1 $1 $! mkConidData (getCONID $1) }
+          | QCONSYM           { sL1 $1 $! mkQConsymData (getQCONSYM $1) }
+          | CONSYM            { sL1 $1 $! mkConsymData (getCONSYM $1) }
+          | QVARID            { sL1 $1 $! mkQVaridData (getQVARID $1) }
+          | VARID             { sL1 $1 $! mkVaridData (getVARID $1) }
+          | QVARSYM           { sL1 $1 $! mkQVarsymData (getQVARSYM $1) }
+          | VARSYM            { sL1 $1 $! mkVarsymData (getVARSYM $1) }
+          | IPDUPVARID        { sL1 $1 $! mkIPDupVaridData (getIPDUPVARID $1) }      -- from ipvar
+          | LABELVARID        { sL1 $1 $! mkLabelVaridData (getLABELVARID $1) }      -- from overloaded_label
+          | TH_ID_SPLICE      { sL1 $1 $! mkThIdSpliceData (getTH_ID_SPLICE $1) }    -- from splice_exp
+          | TH_ID_TY_SPLICE   { sL1 $1 $! mkThIdTySpliceData (getTH_ID_TY_SPLICE $1) } -- from splice_exp
+          | quasiquote        { sL1 $1 $! mkQuasiquoteData (unLoc $1) }
+          | ':'               { sL1 $1 $! mkColonData (fsLit ":") }
+          | '->'              { sL1 $1 $! mkArrowData (fsLit "->") }
+          | '~'               { sL1 $1 $! mkTwiddleData (fsLit "~") }
+          | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
 tup_terms :: { }
           : terms commas_tup_tail_terms
@@ -3821,13 +3821,13 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 
 
 check_aexp2 :: LHsTerms -> LHsExpr GhcPs
-check_aexp2 (x@(L sp (HsGenName name)) : xs)
+check_aexp2 ((L sp (HsGenName name)) : [])
   = case name of
-      Just (OneHsOverLit hsl) -> case gdata of
-                      Hs
-      Nothing ->
-
-
+      | L sp2 (IPDupVaridData d) -> sL1 name (HsIPVar noExt $! d)
+      | L sp2 (LabelVaridData d) -> sL1 name (HsOverLabel noExt $! d)               -- overloaded_label
+      | L sp2 (LiteralData d)    -> sL1 name (HsLit noExt $! d)               -- literal
+      | L sp2 (IntegerData d)    -> sL (getLoc name) (HsOverLit noExt $! d )  -- INTEGER
+      | L sp2 (RationalData d)   -> sL (getLoc name) (HsOverLit noExt $! d )  -- RATIONAL
 
 
 
