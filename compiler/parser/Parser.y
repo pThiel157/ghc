@@ -3838,8 +3838,9 @@ check_aexp2 ((L sp (HsParTerm pt) : [])
       -- TODO: Case for '(' commas ')'
 check_aexp2 ((L sp (HsBoxParTerm bpt) : [])
   = case bpt of
-      [] ->   L sp $! nameRdrName (dataCOnName unboxedUnitDataCon)
+      [] ->   L sp $! nameRdrName (dataConName unboxedUnitDataCon)
       -- TODO: Case for '(#' commas '#)'
+
 
 
 {- Note [Adding location info]
