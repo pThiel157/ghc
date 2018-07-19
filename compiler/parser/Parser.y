@@ -2557,7 +2557,7 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                          }
 
 terms     :: { LHsTerms }
-          :-- term                          { [$1] }
+          -- : term                          { [$1] }
           | term terms                    { $1 : $2 }
           | {- empty -}                   { [] }
 
@@ -2649,6 +2649,7 @@ gen_name  :: { Located GenData }
           | ':'               { sL1 $1 $! mkColonData (fsLit ":") }
           | '->'              { sL1 $1 $! mkArrowData (fsLit "->") }
           | '~'               { sL1 $1 $! mkTwiddleData (fsLit "~") }
+          | '-'               { sL1 $1 $! mkMinusSignData (fsLit "-") }
           | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
 tup_terms :: { LHsTerm }
@@ -2670,6 +2671,7 @@ bar_terms2 :: { LHsTerm }
           : terms '|' terms               { HsBarTerms2 [$1, $3] }  -- sL1 (HsTermBar $1) : $3 }
           | terms '|' bar_terms2          { HsBarTerms2 ($1 : (getTerms $3))
                                               where getTerms (HsBarTerms2 t) = t) }
+
 
 
 fexp    :: { LHsExpr GhcPs }
@@ -3823,26 +3825,58 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 check_aexp2 :: LHsTerms -> LHsExpr GhcPs
 check_aexp2 ((L sp (HsGenName name)) : [])
   = case name of
-      L _ (ConidData d)      -> L sp $! mkUnqual dataName d           -- CONID in qcon
-      L _ (QConidData d)     -> L sp $! mkQual dataName d             -- QCONID in qcon
-      L _ (IPDupVaridData d) -> L sp (HsIPVar noExt $! d)             -- ipvar
-      L _ (LabelVaridData d) -> L sp (HsOverLabel noExt $! d)         -- overloaded_label
-      L _ (LiteralData d)    -> L sp (HsLit noExt $! d)               -- literal
-      L _ (IntegerData d)    -> L sp (HsOverLit noExt $! d )  -- INTEGER
-      L _ (RationalData d)   -> L sp (HsOverLit noExt $! d )  -- RATIONAL
+      L _ (ConidData d)          -> L sp $! mkUnqual dataName d           -- CONID in qcon
+      L _ (QConidData d)         -> L sp $! mkQual dataName d             -- QCONID in qcon
+      L _ (VaridData d)          -> L sp $! mkUnqual varName d            -- VARID in qvar
+      L _ (QVaridData d)         -> L sp $! mkQual varName d              -- QVARID in qvar
+      L _ (SpecialIdData d)      -> L sp $! mkUnqual varName d            -- special_id in qvar
+      L _ (UnsafeData d)         -> L sp $! mkUnqual varName d            -- 'unsafe' in qvar
+      L _ (SafeData d)           -> L sp $! mkUnqual varName d            -- 'safe' in qvar
+      L _ (InterruptibleData d)  -> L sp $! mkUnqual varName d            -- 'interruptible' in qvar
+      L _ (ForallData d)         -> L sp $! mkUnqual varName d            -- 'forall' in qvar
+      L _ (FamilyData d)         -> L sp $! mkUnqual varName d            -- 'family' in qvar
+      L _ (RoleData d)           -> L sp $! mkUnqual varName d            -- 'role' in qvar
+      L _ (IPDupVaridData d)     -> L sp (HsIPVar noExt $! d)             -- ipvar
+      L _ (LabelVaridData d)     -> L sp (HsOverLabel noExt $! d)         -- overloaded_label
+      L _ (LiteralData d)        -> L sp (HsLit noExt $! d)               -- literal
+      L _ (IntegerData d)        -> L sp (HsOverLit noExt $! d )          -- INTEGER
+      L _ (RationalData d)       -> L sp (HsOverLit noExt $! d )          -- RATIONAL
+      L _ (ThIdSpliceData d)     -> L sp $ mkHsSpliceE HasDollar          -- TH_ID_SPLICE in splice_exp
+                                    (L sp $ HsVar noExt (L sp (mkUnqual varName
+                                                              (getTH_ID_SPLICE $1))))
+      L _ (ThIdTySpliceData d)   -> L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
+                                    (L sp $ HsVar noExt (L sp (mkUnqual varName
+                                                              (getTH_ID_TY_SPLICE $1))))
 check_aexp2 ((L sp (HsParTerm pt) : [])
   = case pt of
-      ((L _ (HsGenName (L _ (ConsymData d)))) : [])  -> L sp $! mkUnqual varName d    -- '(' CONSYM ')' in qcon
-      ((L _ (HsGenName (L _ (ColonData d)))) : [])   -> L sp $! consDataCon_RDR       -- '(' ':' ')' in qcon
-      ((L _ (HsGenName (L _ (QConsymData d)))) : []) -> L sp $! mkQual dataName d     -- '(' QCONSYM ')' in qcon
-      []                                             -> L sp $! nameRdrName (dataConName unitDataCon)
+      ((L _ (HsGenName (L _ (ConsymData d)))) : [])       -> L sp $! mkUnqual varName d    -- '(' CONSYM ')' in qcon
+      ((L _ (HsGenName (L _ (ColonData d)))) : [])        -> L sp $! consDataCon_RDR       -- '(' ':' ')' in qcon
+      ((L _ (HsGenName (L _ (QConsymData d)))) : [])      -> L sp $! mkQual dataName d     -- '(' QCONSYM ')' in qcon
+      ((L _ (HsGenName (L _ (VarsymData d)))) : []))      -> L sp $! mkUnqual varName d    --  '(' VARYSM ')' in qvar
+      ((L _ (HsGenName (L _ (QVarsymData d)))) : []))     -> L sp $! mkQual varName d      --  '(' QVARYSM ')' in qvar
+      ((L _ (HsGenName (L _ (SpecialSymData d)))) : []))  -> L sp $! mkUnqual varName d    -- special_sym in qvar
+      ((L _ (HsGenName (L _ (MinusSignData d)))) : []))   -> L sp $! mkUnqual varName d    -- '(' '-' ')'
+      []                                                  -> L sp $! nameRdrName (dataConName unitDataCon)   -- '(' ')'
       -- TODO: Case for '(' commas ')'
 check_aexp2 ((L sp (HsBoxParTerm bpt) : [])
   = case bpt of
-      [] ->   L sp $! nameRdrName (dataConName unboxedUnitDataCon)
+      [] ->   L sp $! nameRdrName (dataConName unboxedUnitDataCon)  -- '(#' '#)' in qcon
       -- TODO: Case for '(#' commas '#)'
+check_aexp2 ((L sp (HsBracketTerm bt) : [])
+  = case bt of
+      ((L _ (HsListTerm l)) : []) -> L sp (snd l)                                   -- '[' list ']'
+      []                          ->  L sp $! nameRdrName (dataConName nilDataCon)  -- '[' ']' in qcon
+check_aexp2 ((L sp HsUnderscoreTerm) : [])              = L sp $ EWildPat noExt              -- '_'
+check_aexp2 ((L sp (HsDollarParenTerm dpt)) : [])        = L sp $ mkHsSpliceE HasParens dpt    -- '$(' exp ')' in splice_exp
+check_aexp2 ((L sp (HsDoubleDollarParenTerm ddpt)) : []) = L sp $ mkHsSpliceTE HasParens ddpt  -- '$$(' exp ')' in splice_exp
+check_aexp2 ((L sp (HsSimplequoteTerm sqt)) : [])
+  = case sqt of
+      -- qcon
+      -- qvar
 
+matchQcon :: LHsTerms -> Located RdrName
 
+matchQvar :: LHsTerms -> Located RdrName
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
