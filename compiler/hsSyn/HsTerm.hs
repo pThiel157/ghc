@@ -91,16 +91,7 @@ data GenData = UnsafeData FastString
              | TwiddleData FastString
              | SpecialSymData FastString
 
-             --  OneFS FastString
-             -- | TwoFS FastString FastString
-             -- | OneHsLit (HsLit GhcPs)
-             -- | OneHsOverLit (HsOverLit GhsPs)
-             -- | OneHsSplice (HsSplice GhcPs)
-             --  -- | OneChar Char
-             --  -- | OneSRT SourceText
-             --  -- | OneInt Integer
-             --  -- | OneBString ByteString
-             --  -- | OneFracLit FractionalLit
+
 mkUnsafeData        :: FastString -> GenData
 mkSafeData          :: FastString -> GenData
 mkInterruptibleData :: FastString -> GenData
@@ -509,9 +500,18 @@ data HsTerm
           (LHsType GhcPs)
   | HsGenName
           (Located GenData)
+  | HsTupTerm
+          (Located HsTupTerm)
+
+data HsTupTerm
+  = HsCommaTupTerm
+          Bool   -- if starts with commas, True, otherwise False
+          []
+  | HsBarsTupTerm
+  | HsBar_TermsTupTerm
 
 
-
+appendCommaTuTerm :: commas -
 
 {-
 -- | A Haskell term.

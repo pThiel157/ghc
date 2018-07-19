@@ -2556,14 +2556,9 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 )))
                                          }
 terms     :: { LHsTerms }  -- what should we do on the right hand side for this???
-<<<<<<< HEAD
-          :-- term                          { [$1] }
+          : -- term                          { [$1] }
           | term terms                    { $1 : $2 }
           | {- empty -}                   { [] }
-=======
-          : term                          { [$1] }
-          | terms term                    { $1 ++ $2 }
->>>>>>> 9c492aa8d6382006778605858c825180c4cebe68
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
 term      :: { LHsTerm }
@@ -2657,7 +2652,7 @@ gen_name  :: { Located GenData }
           | '~'               { sL1 $1 $! mkTwiddleData (fsLit "~") }
           | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
-tup_terms :: { }
+tup_terms :: { LHsTerm }
           : terms commas_tup_tail_terms
           | terms bars
           | bar_terms2     -- This needs to be added to cover tuples in types
@@ -3625,7 +3620,7 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
 -- Documentation comments
 
 docnext :: { LHsDocString }
-  : DOCNEXT {% return (sL1 $1 (mkHsDocString (getDOCNEXT $1))) }
+  : DOCNEXT {% return (sL1 $1 (mkHsDocString (getDOCNEXxT $1))) }
 
 docprev :: { LHsDocString }
   : DOCPREV {% return (sL1 $1 (mkHsDocString (getDOCPREV $1))) }
