@@ -2555,8 +2555,9 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                                 , getINTEGERs $9
                                                 )))
                                          }
-terms     :: { LHsTerms }  -- what should we do on the right hand side for this???
-          : -- term                          { [$1] }
+
+terms     :: { LHsTerms }
+          :-- term                          { [$1] }
           | term terms                    { $1 : $2 }
           | {- empty -}                   { [] }
 
@@ -2610,9 +2611,7 @@ term      :: { LHsTerm }
           | '_'                           { sL1 $1 $ HsUnderscoreTerm }
           | list                          { sL1 $1 $ HsListTerm $1 }-- Is this right?
           | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
-          | gen_name                      { sL1 (loc $1) $ HsGenName $1
-                                            where loc x = case x of
-                                                          Nothing -> }
+          | gen_name                      { sL1 $1 $ HsGenName $1 }
           -- need to add case: 'name' '@' pattern
           -- '_', ';', '|', '..'
 
@@ -2653,25 +2652,24 @@ gen_name  :: { Located GenData }
           | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
 tup_terms :: { LHsTerm }
-          : terms commas_tup_tail_terms
-          | terms bars
-          | bar_terms2     -- This needs to be added to cover tuples in types
-          | commas tup_tail_terms
+          : terms commas_tup_tail_terms   { [$1] ++ $2 }
+          | terms bars                    { [$1] ++ (sL1 $2 (HsBarTerm $2)) }  -- [HsBarTerm (terms bars)]
+          | bar_terms2                    { [$1] } -- This needs to be added to cover tuples in types
+          | commas tup_tail_terms         { [] }
           | bars terms bars0
 
-commas_tup_tail_terms :: {  }
-          : commas tup_tail_terms
+commas_tup_tail_terms :: { HsTupTerm }
+          : commas tup_tail_terms         { (HsCommaTerm $1) : $2 }
 
-tup_tail_terms :: {  }
-          : terms commas_tup_tail_terms
-          | terms
-          | {- empty -}      -- We might not need this case since terms can also boil down to {- empty -}
+tup_tail_terms :: { HsTupTerm }
+          : terms commas_tup_tail_terms   { $1 ++ $2 }
+          | terms                         { [$1] }
+          | {- empty -}                   { [] } -- We might not need this case since terms can also boil down to {- empty -}
 
-bar_terms2 :: { [LHsTerm] }
-          : terms '|' terms
-          | terms '|' bar_terms2
-
-
+bar_terms2 :: { LHsTerm }
+          : terms '|' terms               { HsBarTerms2 [$1, $3] }  -- sL1 (HsTermBar $1) : $3 }
+          | terms '|' bar_terms2          { HsBarTerms2 ($1 : (getTerms $3))
+                                              where getTerms (HsBarTerms2 t) = t) }
 
 
 fexp    :: { LHsExpr GhcPs }
@@ -3825,11 +3823,24 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 check_aexp2 :: LHsTerms -> LHsExpr GhcPs
 check_aexp2 ((L sp (HsGenName name)) : [])
   = case name of
-      | L sp2 (IPDupVaridData d) -> sL1 name (HsIPVar noExt $! d)
-      | L sp2 (LabelVaridData d) -> sL1 name (HsOverLabel noExt $! d)               -- overloaded_label
-      | L sp2 (LiteralData d)    -> sL1 name (HsLit noExt $! d)               -- literal
-      | L sp2 (IntegerData d)    -> sL (getLoc name) (HsOverLit noExt $! d )  -- INTEGER
-      | L sp2 (RationalData d)   -> sL (getLoc name) (HsOverLit noExt $! d )  -- RATIONAL
+      L _ (ConidData d)      -> L sp $! mkUnqual dataName d           -- CONID in qcon
+      L _ (QConidData d)     -> L sp $! mkQual dataName d             -- QCONID in qcon
+      L _ (IPDupVaridData d) -> L sp (HsIPVar noExt $! d)             -- ipvar
+      L _ (LabelVaridData d) -> L sp (HsOverLabel noExt $! d)         -- overloaded_label
+      L _ (LiteralData d)    -> L sp (HsLit noExt $! d)               -- literal
+      L _ (IntegerData d)    -> L sp (HsOverLit noExt $! d )  -- INTEGER
+      L _ (RationalData d)   -> L sp (HsOverLit noExt $! d )  -- RATIONAL
+check_aexp2 ((L sp (HsParTerm pt) : [])
+  = case pt of
+      ((L _ (HsGenName (L _ (ConsymData d)))) : [])  -> L sp $! mkUnqual varName d    -- '(' CONSYM ')' in qcon
+      ((L _ (HsGenName (L _ (ColonData d)))) : [])   -> L sp $! consDataCon_RDR       -- '(' ':' ')' in qcon
+      ((L _ (HsGenName (L _ (QConsymData d)))) : []) -> L sp $! mkQual dataName d     -- '(' QCONSYM ')' in qcon
+      []                                             -> L sp $! nameRdrName (dataConName unitDataCon)
+      -- TODO: Case for '(' commas ')'
+check_aexp2 ((L sp (HsBoxParTerm bpt) : [])
+  = case bpt of
+      [] ->   L sp $! nameRdrName (dataConName unboxedUnitDataCon)
+      -- TODO: Case for '(#' commas '#)'
 
 
 
