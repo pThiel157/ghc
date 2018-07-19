@@ -90,6 +90,7 @@ data GenData = UnsafeData FastString
              | ArrowData FastString
              | TwiddleData FastString
              | SpecialSymData FastString
+             | MinusSignData FastString
 
 
 mkUnsafeData        :: FastString -> GenData
@@ -119,6 +120,7 @@ mkColonData         :: FastString -> GenData
 mkArrowData         :: FastString -> GenData
 mkTwiddleData       :: FastString -> GenData
 mkSpecialSymData    :: FastString -> GenData
+mkMinusSignData     :: FastString -> GenData
 
 mkUnsafeData        = UnsafeData
 mkSafeData          = SafeData
@@ -147,6 +149,7 @@ mkColonData         = ColonData
 mkArrowData         = ArrowData
 mkTwiddleData       = TwiddleData
 mkSpecialSymData    = SpecialSymData
+mkMinusSignData     = MinusSignData
 
 {-
 mkOneFS :: FastString -> GenData

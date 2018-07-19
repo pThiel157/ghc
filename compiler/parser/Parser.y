@@ -2609,7 +2609,7 @@ term      :: { LHsTerm }
           | unpackedness strictness atype
           | qvar '@' aexp                 { sLL $1 $> $ HsAtTerm $1 $3 }
           | '_'                           { sL1 $1 $ HsUnderscoreTerm }
-          | list                          { sL1 $1 $ HsListTerm $1 }-- Is this right?
+          | list                          { sL1 $1 $ HsListTerm $1 } -- Is this right?
           | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
           | gen_name                      { sL1 $1 $ HsGenName $1 }
           -- need to add case: 'name' '@' pattern
@@ -3873,6 +3873,10 @@ check_aexp2 ((L sp (HsSimplequoteTerm sqt)) : [])
   = case sqt of
       -- qcon
       -- qvar
+check_aexp2 ((L sp (HsThTyQuoteTerm t)) : [])
+  = case t of
+      L sp2 (HsGenName (SpecialSymData specialSym)) -> if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)) else error "don't know"
+
 
 matchQcon :: LHsTerms -> Located RdrName
 
