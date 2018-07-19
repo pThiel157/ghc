@@ -3847,6 +3847,7 @@ check_aexp2 ((L sp (HsGenName name)) : [])
       L _ (ThIdTySpliceData d)   -> L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
                                     (L sp $ HsVar noExt (L sp (mkUnqual varName
                                                               (getTH_ID_TY_SPLICE $1))))
+      L _ (QuasiquoteData d)     -> L sp $ HsSpliceE noExt (unLoc d)      -- quasiquote
 check_aexp2 ((L sp (HsParTerm pt) : [])
   = case pt of
       ((L _ (HsGenName (L _ (ConsymData d)))) : [])       -> L sp $! mkUnqual varName d    -- '(' CONSYM ')' in qcon
@@ -3878,9 +3879,39 @@ check_aexp2 ((L sp (HsThTyQuoteTerm t)) : [])
       L sp2 (HsGenName (SpecialSymData specialSym)) -> if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)) else error "don't know"
 
 
-matchQcon :: LHsTerms -> Located RdrName
 
-matchQvar :: LHsTerms -> Located RdrName
+check_aexp2 ((L sp (HsThTyQuoteTerm ht)) : [])
+  = case ht of
+      -- TH_TY_QUOTE tyvar
+      (L sp2 (HsGanName hn))
+        -> case hn of
+            VaridData vd
+              -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName vd))
+            SpecialIdData sd
+              -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))
+            UnsafeData ud
+              -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))
+            SafeData safed
+              -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName safed))
+            InterruptibleData id
+              -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName id))
+      -- TH_TY_QUOTE gtycon
+      (L sp2 (HsParTerm []))
+        -> L sp $ HsBracket noExt (Varbr noExt False (getRdrName unitTyCon))
+      (L sp2 (HsBoxParTerm []))
+        -> L sp $ HsBracket noExt (Varbr noExt False (getRdrName unboxedUnitTyCon))
+      -- TODO:: ntgtycon
+
+
+
+check_aexp2 ((L sp (HsExqQuoteterm eqt)) : [])       = L sp $ HsBracket noExt (ExpBr noExt eqt)             -- '[|' exp '|]'
+check_aexp2 ((L sp (HsTExpQuoteTerm teqt)) : [])     = L sp $ HsBracket noExt (TExpBr noExt teqt)           -- '[||' exp '||]'
+check_aexp2 ((L sp (HsTypQuoteTerm tqt)) : [])       = L sp $ HsBracket noExt (TypBr noExt teqt)            -- '[t|' ctype '|]'
+check_aexp2 ((L sp (HsPatQuoteTerm pqt)) : [])       = L sp $ HsBracket noExt (PatBr noExt teqt)            -- '[p|' infixexp '|]'
+check_aexp2 ((L sp (HsDecQuoteTerm dqt)) : [])       = L sp $ HsBracket noExt (DecBrL noExt teqt)           -- '[d|' cvtopbody '|]'
+check_aexp2 ((L sp (HsParenBarTerm pbt1 pbt2)) : []) = L sp $ HsArrForm noExt pbt1 Nothing (reverse pbt2) -- '[d|' cvtopbody '|]'
+
+
 
 {- Note [Adding location info]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
