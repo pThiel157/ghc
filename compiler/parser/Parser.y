@@ -2652,25 +2652,25 @@ gen_name  :: { Located GenData }
           | '-'               { sL1 $1 $! mkMinusSignData (fsLit "-") }
           | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
-tup_terms :: { LHsTerm }
-          : terms commas_tup_tail_terms   { [$1] ++ $2 }
-          | terms bars                    { [$1] ++ (sL1 $2 (HsBarTerm $2)) }  -- [HsBarTerm (terms bars)]
-          | bar_terms2                    { [$1] } -- This needs to be added to cover tuples in types
-          | commas tup_tail_terms         { [] }
-          | bars terms bars0
+tup_terms :: { LHsTerms }  -- expression in texp and type-level from atype
+          : terms commas_tup_tail_terms   { (HsTermsInTup $1) : $2 }
+          | terms bars                    { [HsTermsInTup $1, HsTupBars $2] }
+          | bar_terms2                    { [$1] } -- covers the case '(#' bar_types '#)' in atype
+          | commas tup_tail_terms         { (HsTupCommas $1) :  $2}
+          | bars terms bars0              { [HsTupBars $1, HsTermsInTup $2, HsTupBars $3] }
 
-commas_tup_tail_terms :: { HsTupTerm }
-          : commas tup_tail_terms         { (HsCommaTerm $1) : $2 }
+commas_tup_tail_terms :: { LHsTerms }
+          : commas tup_tail_terms         { (HsTupCommas $1) : $2 }  -- [HsCommaTerm $1] ++ $2
 
-tup_tail_terms :: { HsTupTerm }
-          : terms commas_tup_tail_terms   { $1 ++ $2 }
-          | terms                         { [$1] }
+tup_tail_terms :: { LHsTerms }
+          : terms commas_tup_tail_terms   { (HsTermsInTup $1) : $2 }
+          | terms                         { [HsTermsInTup $1] }
           | {- empty -}                   { [] } -- We might not need this case since terms can also boil down to {- empty -}
 
 bar_terms2 :: { LHsTerm }
           : terms '|' terms               { HsBarTerms2 [$1, $3] }  -- sL1 (HsTermBar $1) : $3 }
           | terms '|' bar_terms2          { HsBarTerms2 ($1 : (getTerms $3))
-                                              where getTerms (HsBarTerms2 t) = t) }
+                                              where getTerms (HsBarTerms2 ts) = ts) }
 
 
 
