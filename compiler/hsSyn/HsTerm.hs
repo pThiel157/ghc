@@ -90,6 +90,7 @@ data GenData = UnsafeData FastString
              | ArrowData FastString
              | TwiddleData FastString
              | SpecialSymData FastString
+             | MinusSignData FastString
 
 
 mkUnsafeData        :: FastString -> GenData
@@ -119,6 +120,7 @@ mkColonData         :: FastString -> GenData
 mkArrowData         :: FastString -> GenData
 mkTwiddleData       :: FastString -> GenData
 mkSpecialSymData    :: FastString -> GenData
+mkMinusSignData     :: FastString -> GenData
 
 mkUnsafeData        = UnsafeData
 mkSafeData          = SafeData
@@ -147,6 +149,7 @@ mkColonData         = ColonData
 mkArrowData         = ArrowData
 mkTwiddleData       = TwiddleData
 mkSpecialSymData    = SpecialSymData
+mkMinusSignData     = MinusSignData
 
 {-
 mkOneFS :: FastString -> GenData
@@ -403,11 +406,11 @@ data HsTerm
   = HsParTerm
           LHsTerms
   | HsTupParTerm
-          --TODO
+          LHsTerms
   | HsBoxParTerm
           LHsTerms
   | HsBoxTupParTerm
-          --TODO
+          LHsTerms
   | HsBracketTerm
           LHsTerms
   | HsBacktickTerm
@@ -500,18 +503,24 @@ data HsTerm
           (LHsType GhcPs)
   | HsGenName
           (Located GenData)
-  | HsTupTerm
-          (Located HsTupTerm)
+  | HsTermsInTup
+          LHsTerms
+  | HsTupCommas     -- wrap commas as LHsTerm type
+          ([SrcSpan],Int)
+  | HsBarTerms2
+          [LHsTerms]
+  | HsTupBars
+          ([SrcSpan],Int)
+  -- | HsTupTerm
+  --         LHsTerms  -- a list of terms”
 
+{-
 data HsTupTerm
-  = HsCommaTupTerm
-          Bool   -- if starts with commas, True, otherwise False
-          []
+  = HsCommaTupTerm LHsTerms  -- HsCommaTupTerm [LHsTerm]
   | HsBarsTupTerm
   | HsBar_TermsTupTerm
-
-
-appendCommaTuTerm :: commas -
+  | HsJustCommas ([SrcSpan],Int)
+-}
 
 {-
 -- | A Haskell term.
