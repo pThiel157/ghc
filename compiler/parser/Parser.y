@@ -3821,71 +3821,42 @@ loc_rdr_exp_to_type _ = error "Trying to run loc_rdr_exp_to_type on unhandled ca
 --loc_rdr_exp_to_type c@(L _ (Exact _)) = c
 
 
-check_aexp2 :: LHsTerms -> LHsExpr GhcPs
-check_aexp2 ((L sp (HsGenName name)) : [])
-  = case name of
-      L _ (ConidData d)          -> L sp $! mkUnqual dataName d           -- CONID in qcon
-      L _ (QConidData d)         -> L sp $! mkQual dataName d             -- QCONID in qcon
-      L _ (VaridData d)          -> L sp $! mkUnqual varName d            -- VARID in qvar
-      L _ (QVaridData d)         -> L sp $! mkQual varName d              -- QVARID in qvar
-      L _ (SpecialIdData d)      -> L sp $! mkUnqual varName d            -- special_id in qvar
-      L _ (UnsafeData d)         -> L sp $! mkUnqual varName d            -- 'unsafe' in qvar
-      L _ (SafeData d)           -> L sp $! mkUnqual varName d            -- 'safe' in qvar
-      L _ (InterruptibleData d)  -> L sp $! mkUnqual varName d            -- 'interruptible' in qvar
-      L _ (ForallData d)         -> L sp $! mkUnqual varName d            -- 'forall' in qvar
-      L _ (FamilyData d)         -> L sp $! mkUnqual varName d            -- 'family' in qvar
-      L _ (RoleData d)           -> L sp $! mkUnqual varName d            -- 'role' in qvar
-      L _ (IPDupVaridData d)     -> L sp (HsIPVar noExt $! d)             -- ipvar
-      L _ (LabelVaridData d)     -> L sp (HsOverLabel noExt $! d)         -- overloaded_label
-      L _ (LiteralData d)        -> L sp (HsLit noExt $! d)               -- literal
-      L _ (IntegerData d)        -> L sp (HsOverLit noExt $! d )          -- INTEGER
-      L _ (RationalData d)       -> L sp (HsOverLit noExt $! d )          -- RATIONAL
-      L _ (ThIdSpliceData d)     -> L sp $ mkHsSpliceE HasDollar          -- TH_ID_SPLICE in splice_exp
-                                    (L sp $ HsVar noExt (L sp (mkUnqual varName
-                                                              (getTH_ID_SPLICE $1))))
-      L _ (ThIdTySpliceData d)   -> L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
-                                    (L sp $ HsVar noExt (L sp (mkUnqual varName
-                                                              (getTH_ID_TY_SPLICE $1))))
-      L _ (QuasiquoteData d)     -> L sp $ HsSpliceE noExt (unLoc d)      -- quasiquote
+-- -- ############ Check function for `aexp2`: ############
 
-check_aexp2 ((L sp (HsParTerm pt) : [])
-  = case pt of
-      ((L _ (HsGenName (L _ (ConsymData d)))) : [])       -> L sp $! mkUnqual varName d    -- '(' CONSYM ')' in qcon
-      ((L _ (HsGenName (L _ (ColonData d)))) : [])        -> L sp $! consDataCon_RDR       -- '(' ':' ')' in qcon
-      ((L _ (HsGenName (L _ (QConsymData d)))) : [])      -> L sp $! mkQual dataName d     -- '(' QCONSYM ')' in qcon
-      ((L _ (HsGenName (L _ (VarsymData d)))) : []))      -> L sp $! mkUnqual varName d    --  '(' VARYSM ')' in qvar
-      ((L _ (HsGenName (L _ (QVarsymData d)))) : []))     -> L sp $! mkQual varName d      --  '(' QVARYSM ')' in qvar
-      ((L _ (HsGenName (L _ (SpecialSymData d)))) : []))  -> L sp $! mkUnqual varName d    -- '(' special_sym ')' in qvar
-      ((L _ (HsGenName (L _ (MinusSignData d)))) : []))   -> L sp $! mkUnqual varName d    -- '(' '-' ')' in qvar
-      []                                                  -> L sp $! nameRdrName (dataConName unitDataCon)   -- '(' ')' in qcon
-
-check_aexp2 ((L sp (HsBoxParTerm bpt) : [])
-  = case bpt of
-      [] ->   L sp $! nameRdrName (dataConName unboxedUnitDataCon)  -- '(#' '#)' in qcon
-      -- TODO: Case for '(#' commas '#)' in qcon
+check_aexp2 ((L sp (HsGenName (L _ (IPDupVaridData d)))) : []) -> L sp (HsIPVar noExt $! d)             -- ipvar
+check_aexp2 ((L sp (HsGenName (L _ (LabelVaridData d)))) : []) -> L sp (HsOverLabel noExt $! d)         -- overloaded_label
+check_aexp2 ((L sp (HsGenName (L _ (LiteralData d)))) : [])    -> L sp (HsLit noExt $! d)               -- literal
+check_aexp2 ((L sp (HsGenName (L _ (IntegerData d)))) : [])    -> L sp (HsOverLit noExt $! d )          -- INTEGER
+check_aexp2 ((L sp (HsGenName (L _ (RationalData d)))) : [])   -> L sp (HsOverLit noExt $! d )
+check_aexp2 ((L sp (HsGenName (L _ (ThIdSpliceData d)))) : []) -> L sp $ mkHsSpliceE HasDollar          -- TH_ID_SPLICE in splice_exp
+                                                                        (L sp $ HsVar noExt (L sp (mkUnqual varName
+                                                                                                  (getTH_ID_SPLICE $1))))
+check_aexp2 ((L sp (HsGenName (L _ (ThIdTySpliceData d)))) : []) -> L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
+                                                                    (L sp $ HsVar noExt (L sp (mkUnqual varName
+                                                                                              (getTH_ID_TY_SPLICE $1))))
+check_aexp2 ((L sp (HsGenName (L _ (QuasiquoteData d)))) : [])   -> L sp $ HsSpliceE noExt (unLoc d)      -- quasiquote
+check_aexp2 ((L sp (HsBracketTerm (L _ (HsListTerm l)) : []) : []) = L sp (snd l) -- '[' list ']'
+check_aexp2 ((L sp HsUnderscoreTerm) : [])               = L sp $ EWildPat noExt              -- '_'
+check_aexp2 ((L sp (HsDollarParenTerm dpt)) : [])        = L sp $ mkHsSpliceE HasParens dpt    -- '$(' exp ')' in splice_exp
+check_aexp2 ((L sp (HsDoubleDollarParenTerm ddpt)) : []) = L sp $ mkHsSpliceTE HasParens ddpt  -- '$$(' exp ')' in splice_exp
 
 check_aexp2 ((L sp (HsTupParTerm tpt) : [])
   = case tpt of
-      ((L _ (HsGenName (L _ (ConsymData d)))) : [])  --'(' commas ')' in qcon
+      ((L _ (HsTupCommas c)) : []) ->
 
-check_aexp2 ((L sp (HsBracketTerm bt) : [])
-  = case bt of
-      ((L _ (HsListTerm l)) : []) -> L sp (snd l)                                   -- '[' list ']'
-      []                          ->  L sp $! nameRdrName (dataConName nilDataCon)  -- '[' ']' in qcon
-check_aexp2 ((L sp HsUnderscoreTerm) : [])              = L sp $ EWildPat noExt              -- '_'
-check_aexp2 ((L sp (HsDollarParenTerm dpt)) : [])        = L sp $ mkHsSpliceE HasParens dpt    -- '$(' exp ')' in splice_exp
-check_aexp2 ((L sp (HsDoubleDollarParenTerm ddpt)) : []) = L sp $ mkHsSpliceTE HasParens ddpt  -- '$$(' exp ')' in splice_exp
 check_aexp2 ((L sp (HsSimplequoteTerm sqt)) : [])
-  = case sqt of
-      -- qcon
-      -- qvar
+  = case (check_qcon_aexp2 sqt) of
+      Just qconRdrn -> L sp $ HsBracket noExt (VarBr noExt True (unloc qconRdrn))
+      Nothing -> case (check_qvar_aexp2 sqt) of
+                    Just qvarRdrn -> L sp $ HsBracket noExt (VarBr noExt True (unloc qvarRdrn))
+                    Nothing -> error "SIMPLEQUOTE can only be followed by `qcon` or `qvar`"
 
-check_aexp2 ((L sp (HsThTyQuoteTerm t)) : [])
-  = case t of
-      L sp2 (HsGenName (SpecialSymData specialSym)) -> if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)) else error "don't know"
+check_aexp2 ((L sp (HsThTyQuoteTerm (L _ (HsGenName (SpecialSymData specialSym))))) : [])
+  = if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)) else error "don't know"
+
 check_aexp2 ((L sp (HsThTyQuoteTerm htqt)) : [])
   = case htqt of
-      (L sp2 (HsGanName hn))
+      (L _ (HsGanName hn))
         -> case hn of
             VaridData vd         -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName vd))     -- VARID in tyvarid
             SpecialIdData sd     -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))     -- special_id in tyvarid
@@ -3894,7 +3865,7 @@ check_aexp2 ((L sp (HsThTyQuoteTerm htqt)) : [])
             InterruptibleData id -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName id))     -- 'interruptible' in tyvarid
             QConidData qd        -> L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qd))    -- 'QCONID' in qtycon (oqtycon, ntgtycon, gtycon)
             ConidData cd         -> L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName cd))  -- 'CONID' in tycon (qtycon, oqtycon, ntgtycon, gtycon)
-      (L sp2 (HsParTerm ht))
+      (L _ (HsParTerm ht))
         case ht of
           [] -> L sp $ HsBracket noExt (VarBr noExt False (getRdrName unitTyCon))                                           -- '(' ')' in gtycon
           L _ (HsGenName (L _ (ArrowData _)))       -> L sp $ HsBracket noExt (VarBr noExt False (getRdrName funTyCon))     -- '(' '->' ')' in ntgtycon (gtycon)
@@ -3905,17 +3876,167 @@ check_aexp2 ((L sp (HsThTyQuoteTerm htqt)) : [])
           L _ (HsGenName (L _ (VarsymData vsd)))    -> L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName vsd))    -- VARSYM in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
           L _ (HsGenName (L _ (ColonData _)))       -> L sp $ HsBracket noExt (VarBr noExt False consDataCon_RDR)           -- ':' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
           L _ (HsGenName (L _ (MinusSignData md)))  -> L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName md))     -- '-' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
-      (L sp2 (HsBoxParTerm []))  -> L sp $ HsBracket noExt (Varbr noExt False (getRdrName unboxedUnitTyCon))  -- '(#' '#)' in tyvarid
-      (L sp2 (HsBracketTerm [])) -> L sp $ HsBracket noExt (VarBr noExt False listTyCon_RDR)                  -- '[' ']' in ntgtycon
-      (L sp2 ())
+      (L _ (HsBoxParTerm []))  -> L sp $ HsBracket noExt (Varbr noExt False (getRdrName unboxedUnitTyCon))  -- '(#' '#)' in tyvarid
+      (L _ (HsBracketTerm [])) -> L sp $ HsBracket noExt (VarBr noExt False listTyCon_RDR)                  -- '[' ']' in ntgtycon
+      (L _ ())
       -- TODO:: ntgtycon -> '(' commas ')' '(#' commas '#)'
 
 check_aexp2 ((L sp (HsExqQuoteterm eqt)) : [])       = L sp $ HsBracket noExt (ExpBr noExt eqt)             -- '[|' exp '|]'
 check_aexp2 ((L sp (HsTExpQuoteTerm teqt)) : [])     = L sp $ HsBracket noExt (TExpBr noExt teqt)           -- '[||' exp '||]'
-check_aexp2 ((L sp (HsTypQuoteTerm tqt)) : [])       = L sp $ HsBracket noExt (TypBr noExt teqt)            -- '[t|' ctype '|]'
-check_aexp2 ((L sp (HsPatQuoteTerm pqt)) : [])       = L sp $ HsBracket noExt (PatBr noExt teqt)            -- '[p|' infixexp '|]'
-check_aexp2 ((L sp (HsDecQuoteTerm dqt)) : [])       = L sp $ HsBracket noExt (DecBrL noExt teqt)           -- '[d|' cvtopbody '|]'
+check_aexp2 ((L sp (HsTypQuoteTerm tqt)) : [])       = L sp $ HsBracket noExt (TypBr noExt tqt)             -- '[t|' ctype '|]'
+check_aexp2 ((L sp (HsPatQuoteTerm pqt)) : [])       = (% checkPattern empty pqt >>= \p ->                  -- '[p|' infixexp '|]'
+                                                          return (L sp $ HsBracket noExt (PatBr noExt p)))
+check_aexp2 ((L sp (HsDecQuoteTerm dqt)) : [])       = L sp $ HsBracket noExt (DecBrL noExt (snd dqt))      -- '[d|' cvtopbody '|]'
 check_aexp2 ((L sp (HsParenBarTerm pbt1 pbt2)) : []) = L sp $ HsArrForm noExt pbt1 Nothing (reverse pbt2)   -- '(|' aexp2 cmdargs '|)'
+
+
+-- ######## Check function for qcon: ########
+check_qcon_aexp2 :: LHsTerms -> Maybe (Located Rdrname)
+check_qcon_aexp2 ((L sp (HsGenName (L _ (ConidData d)))) : [])                           = Just (L sp $ mkUnqual dataName d) -- CONID in qcon
+check_qcon_aexp2 ((L sp (HsGenName (QConidData d))) : [])                                = Just (L sp $ mkQual dataName d)   -- QCONID in qcon
+check_qcon_aexp2 ((L sp (HsParTerm ((L _ (HsGenName (L _ (ConsymData d)))) : [])) : [])  = Just (L sp $ mkUnqual varName d)    -- '(' CONSYM ')' in qcon
+check_qcon_aexp2 ((L sp (HsParTerm ((L _ (HsGenName (L _ (ColonData d)))) : [])) : [])   = Just (L sp $ consDataCon_RDR)       -- '(' ':' ')' in qcon
+check_qcon_aexp2 ((L sp (HsParTerm ((L _ (HsGenName (L _ (QConsymData d)))) : [])) : []) = Just (L sp $ mkQual dataName d)     -- '(' QCONSYM ')' in qcon
+check_qcon_aexp2 ((L sp (HsParTerm []) : [])
+    = Just (L sp $ nameRdrName (dataConName unitDataCon))                              -- '(' ')' in qcon
+check_qcon_aexp2 ((L sp (HsBoxParTerm []) : [])
+    = Just (L sp $ nameRdrName (dataConName unboxedUnitDataCon))                       -- '(#' '#)' in qcon
+check_qcon_aexp2 ((L sp (HsTupParTerm ((L _ (HsTupCommas c)) : []))) : [])
+    = Just (L sp $ nameRdrName (dataConName (tupleDataCon Boxed (snd c + 1))))         --'(' commas ')' in qcon
+check_qcon_aexp2 ((L sp (HsBoxTupParTerm ((L _ (HsTupCommas tc)) : []))) : [])
+    = Just (L sp $ nameRdrName (dataConName $ tupleDataCon Unboxed (snd commas + 1)))  -- '(#' commas '#)' in qcon
+check_qcon_aexp2 ((L sp (HsBracketTerm []]) : [])
+    = Just (L sp (HsVar noExt $! nameRdrName (dataConName nilDataCon)))                -- '[' ']' in qcon
+-- -- ##########################################
+
+-- ######## Check function for qvar: ########
+check_qvar_aexp2 :: LHsTerms -> Maybe (Located RdrName)
+check_qvar_aexp2 ((L sp (HsGenName (VaridData d))) : [])          = Just (L sp $ mkUnqual varName d)            -- VARID in qvar
+check_qvar_aexp2 ((L sp (HsGenName (SpecialIdData d))) : [])      = Just (L sp $ mkUnqual varName d)            -- special_id in qvar
+check_qvar_aexp2 ((L sp (HsGenName (UnsafeData d))) : [])         = Just (L sp $ mkUnqual varName d)            -- 'unsafe' in qvar
+check_qvar_aexp2 ((L sp (HsGenName (SafeData d))) : [])           = Just (L sp $ mkUnqual varName d)            -- 'safe' in qvar
+check_qvar_aexp2 ((L sp (HsGenName (InterruptibleData d))) : [])  = Just (L sp $ mkUnqual varName d)            -- 'interruptible' in qvar
+check_qvar_aexp2 ((L sp (HsGenName (ForallData d))) : [])         = Just (L sp $ mkUnqual varName d)            -- 'forall' in qvar
+check_qvar_aexp2 ((L sp (HsGenName (FamilyData d))) : [])         = Just (L sp $ mkUnqual varName d)            -- 'family' in qvar
+check_qvar_aexp2 ((L sp (HsGenName (RoleData d))) : [])           = Just (L sp $ mkUnqual varName d)            -- 'role' in qvar
+check_qvar_aexp2 ((L sp (HsGenName (QVaridData d))) : [])         = Just (L sp $ mkQual varName d)              -- QVARID in qvar
+check_qvar_aexp2 ((L sp (HsParTerm ((L _ HsGenName (QVarsymData d)) : []))) : [])    = Just $ L sp (mkQual varName d)      --  '(' QVARYSM ')' in qvar
+check_qvar_aexp2 ((L sp (HsParTerm ((L _ HsGenName (VarsymData d)) : []))) : [])     = Just $ L sp (mkUnqual varName d)    --  '(' VARYSM ')' in qvar
+check_qvar_aexp2 ((L sp (HsParTerm ((L _ HsGenName (SpecialSymData d)) : []))) : []) = Just $ L sp (mkUnqual varName d)    -- '(' special_sym ')' in qvar
+check_qvar_aexp2 ((L sp (HsParTerm ((L _ HsGenName (MinusSignData d)) : []))) : [])  = Just $ L sp (mkUnqual varName d)    -- '(' '-' ')' in qvar
+
+-- -- ##########################################
+
+-- ######## old check function for qvar and qcon: ########
+-- check_qvar_aexp2 :: LHsTerms -> Maybe (Located RdrName)
+-- check_qvar_aexp2 ((L sp (HsGenName name)) : [])
+--   = case name of
+--       (L _ (VaridData d) : [])   -> Just (L sp $ mkUnqual varName d)            -- VARID in qvar
+--       (L _ (QVaridData d) : [])  -> Just (L sp $ mkQual varName d)              -- QVARID in qvar
+--       (L _ (SpecialIdData d)     -> Just (L sp $ mkUnqual varName d)            -- special_id in qvar
+--       L _ (UnsafeData d)         -> Just (L sp $ mkUnqual varName d)            -- 'unsafe' in qvar
+--       L _ (SafeData d)           -> Just (L sp $ mkUnqual varName d)            -- 'safe' in qvar
+--       L _ (InterruptibleData d)  -> Just (L sp $ mkUnqual varName d)            -- 'interruptible' in qvar
+--       L _ (ForallData d)         -> Just (L sp $ mkUnqual varName d)            -- 'forall' in qvar
+--       L _ (FamilyData d)         -> Just (L sp $ mkUnqual varName d)            -- 'family' in qvar
+--       L _ (RoleData d)           -> Just (L sp $ mkUnqual varName d)            -- 'role' in qvar
+-- check_qvar_aexp2 ((L sp (HsParTerm pt) : [])
+--   = case pt of
+--       ((L _ (HsGenName (L _ (QVarsymData d)))) : []))     -> Just $ L sp (mkQual varName d)      --  '(' QVARYSM ')' in qvar
+--       ((L _ (HsGenName (L _ (VarsymData d)))) : []))      -> Just $ L sp (mkUnqual varName d)    --  '(' VARYSM ')' in qvar
+--       ((L _ (HsGenName (L _ (SpecialSymData d)))) : []))  -> Just $ L sp (mkUnqual varName d)    -- '(' special_sym ')' in qvar
+--       ((L _ (HsGenName (L _ (MinusSignData d)))) : []))   -> Just $ L sp (mkUnqual varName d)    -- '(' '-' ')' in qvar
+
+
+-- check_qcon_aexp2 :: LHsTerms -> Maybe (Located RdrName)
+-- check_qcon_aexp2 ((L sp (HsGenName name)) : [])
+--   = case name of
+--       L _ (ConidData d)          -> Just (L sp $ mkUnqual dataName d) -- CONID in qcon
+--       L _ (QConidData d)         -> Just (L sp $ mkQual dataName d)   -- QCONID in qcon
+-- check_qcon_aexp2 ((L sp (HsParTerm pt) : [])
+--   = case pt of
+--       ((L _ (HsGenName (L _ (ConsymData d)))) : [])       -> Just (L sp $ mkUnqual varName d)    -- '(' CONSYM ')' in qcon
+--       ((L _ (HsGenName (L _ (ColonData d)))) : [])        -> Just (L sp $ consDataCon_RDR)       -- '(' ':' ')' in qcon
+--       ((L _ (HsGenName (L _ (QConsymData d)))) : [])      -> Just (L sp $ mkQual dataName d)     -- '(' QCONSYM ')' in qcon
+--       []                                                  -> Just (L sp $ nameRdrName (dataConName unitDataCon))   -- '(' ')' in qcon
+-- check_qcon_aexp2 ((L sp (HsBoxParTerm bpt) : [])
+--   = case bpt of
+--       [] ->   Just (L sp $ nameRdrName (dataConName unboxedUnitDataCon))  -- '(#' '#)' in qcon
+-- check_qcon_aexp2 ((L sp (HsTupParTerm tpt) : [])
+--   = case tpt of
+--       ((L _ (HsTupCommas c)) : []) ->   Just (L sp $ nameRdrName (dataConName (tupleDataCon Boxed (snd c + 1)))) --'(' commas ')' in qcon
+-- check_qcon_aexp2 ((L sp (HsBoxTupParTerm btpt)) : [])
+--   = case btpt of
+--       ((L _ (HsTupCommas tc)) : []) -> Just (L sp $ nameRdrName (dataConName $ tupleDataCon Unboxed (snd commas + 1))) -- '(#' commas '#)' in qcon
+-- check_qcon_aexp2 ((L sp (HsBracketTerm []]) : []) =  L sp (HsVar noExt $! nameRdrName (dataConName nilDataCon))  -- '[' ']' in qcon
+
+-- ##########################################
+
+-- code from before
+
+-- check_aexp2 ((L sp (HsGenName name)) : [])
+-- = case name of
+      -- -- L _ (ConidData d)          -> L sp (HsVar noExt $! mkUnqual dataName d )          -- CONID in qcon
+      -- -- L _ (QConidData d)         -> L sp (HsVar noExt $! mkQual dataName d)             -- QCONID in qcon
+      -- -- L _ (VaridData d)          -> L sp (HsVar noExt $! mkUnqual varName d)            -- VARID in qvar
+      -- -- L _ (QVaridData d)         -> L sp (HsVar noExt $! mkQual varName d)              -- QVARID in qvar
+      -- -- L _ (SpecialIdData d)      -> L sp (HsVar noExt $! mkUnqual varName d)            -- special_id in qvar
+      -- -- L _ (UnsafeData d)         -> L sp (HsVar noExt $! mkUnqual varName d)            -- 'unsafe' in qvar
+      -- -- L _ (SafeData d)           -> L sp (HsVar noExt $! mkUnqual varName d)            -- 'safe' in qvar
+      -- -- L _ (InterruptibleData d)  -> L sp (HsVar noExt $! mkUnqual varName d)            -- 'interruptible' in qvar
+      -- -- L _ (ForallData d)         -> L sp (HsVar noExt $! mkUnqual varName d)            -- 'forall' in qvar
+      -- -- L _ (FamilyData d)         -> L sp (HsVar noExt $! mkUnqual varName d)            -- 'family' in qvar
+      -- -- L _ (RoleData d)           -> L sp (HsVar noExt $! mkUnqual varName d)            -- 'role' in qvar
+      -- L _ (IPDupVaridData d)     -> L sp (HsIPVar noExt $! d)             -- ipvar
+      -- L _ (LabelVaridData d)     -> L sp (HsOverLabel noExt $! d)         -- overloaded_label
+      -- L _ (LiteralData d)        -> L sp (HsLit noExt $! d)               -- literal
+      -- L _ (IntegerData d)        -> L sp (HsOverLit noExt $! d )          -- INTEGER
+      -- L _ (RationalData d)       -> L sp (HsOverLit noExt $! d )          -- RATIONAL
+      -- L _ (ThIdSpliceData d)     -> L sp $ mkHsSpliceE HasDollar          -- TH_ID_SPLICE in splice_exp
+      --                               (L sp $ HsVar noExt (L sp (mkUnqual varName
+      --                                                         (getTH_ID_SPLICE $1))))
+      -- L _ (ThIdTySpliceData d)   -> L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
+      --                               (L sp $ HsVar noExt (L sp (mkUnqual varName
+      --                                                         (getTH_ID_TY_SPLICE $1))))
+      -- L _ (QuasiquoteData d)     -> L sp $ HsSpliceE noExt (unLoc d)      -- quasiquote
+
+-- check_aexp2 ((L sp (HsParTerm pt) : [])
+--   = case pt of
+      -- ((L _ (HsGenName (L _ (ConsymData d)))) : [])       -> L sp (HsVar noExt $! mkUnqual varName d)    -- '(' CONSYM ')' in qcon
+      -- ((L _ (HsGenName (L _ (ColonData d)))) : [])        -> L sp (HsVar noExt $! consDataCon_RDR)       -- '(' ':' ')' in qcon
+      -- ((L _ (HsGenName (L _ (QConsymData d)))) : [])      -> L sp (HsVar noExt $! mkQual dataName d)     -- '(' QCONSYM ')' in qcon
+      -- ((L _ (HsGenName (L _ (VarsymData d)))) : []))      -> L sp (HsVar noExt $! mkUnqual varName d)    --  '(' VARYSM ')' in qvar
+      -- ((L _ (HsGenName (L _ (QVarsymData d)))) : []))     -> L sp (HsVar noExt $! mkQual varName d)      --  '(' QVARYSM ')' in qvar
+      -- ((L _ (HsGenName (L _ (SpecialSymData d)))) : []))  -> L sp (HsVar noExt $! mkUnqual varName d)    -- '(' special_sym ')' in qvar
+      -- ((L _ (HsGenName (L _ (MinusSignData d)))) : []))   -> L sp (HsVar noExt $! mkUnqual varName d)    -- '(' '-' ')' in qvar
+      -- []                                                  -> L sp (HsVar noExt $! nameRdrName (dataConName unitDataCon))   -- '(' ')' in qcon
+
+-- check_aexp2 ((L sp (HsBoxParTerm bpt) : [])
+--   = case bpt of
+      -- [] ->   L sp (HsVar noExt $! nameRdrName (dataConName unboxedUnitDataCon))  -- '(#' '#)' in qcon
+
+-- check_aexp2 ((L sp (HsTupParTerm tpt) : [])
+--   = case tpt of
+      -- ((L _ (HsTupCommas c)) : []) -> L sp $ HsVar noExt $! nameRdrName (dataConName (tupleDataCon Boxed (snd c + 1))) -- '(' commas ')' in qcon
+
+-- check_aexp2 ((L sp (HsBoxTupParTerm btpt)) : [])
+--   = case btpt of
+      -- ((L _ (HsTupCommas tc)) : []) -> L sp $ HsVar noExt $! nameRdrName (dataConName $ tupleDataCon Unboxed (snd commas + 1)) -- '(#' commas '#)' in qcon
+
+-- check_aexp2 ((L sp (HsBracketTerm bt) : [])
+--   = case bt of
+--       ((L _ (HsListTerm l)) : []) -> L sp (snd l)                                   -- '[' list ']'
+--       -- []                          ->  L sp (HsVar noExt $! nameRdrName (dataConName nilDataCon))  -- '[' ']' in qcon
+
+-- check_aexp2 ((L sp (HsThTyQuoteTerm t)) : [])
+--   = case t of
+--       L sp2 (HsGenName (SpecialSymData specialSym)) -> if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)) else error "don't know"
+
+-- check_aexp2 :: LHsTerms -> LHsExpr GhcPs
+-- check_aexp2 lt =
+--   case (check_qvar_aexp2 lt) of
+--     Just (L sp rdrn) -> L sp (HsVar noExt $! rdrn)
+--     Nothing -> --TODO: continue to check other cases
 
 
 
