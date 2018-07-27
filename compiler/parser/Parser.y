@@ -3842,23 +3842,54 @@ check_exp rest = (Nothing, rest)
 
 
 -- ############ Check function for `infixexp`: ############
--- TODO: location info can be obtained by applying sLL on infixexp and exp10
-
 check_infixexp :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
 check_infixexp t
-  | (Just exp10, rest) <- check_exp10 t --(Just exp10, rest)    -- exp10   -- TODO make this a case expression here for performance, get rid of the next cases
-    = case (check_qop rest) of
-        (Just op, rest') -> case (check_exp10 rest') of
-                              (Just e', rest'') ->
-check_infixexp -- TODO
+  | (Just exp10, rest) <- check_exp10 t --(Just exp10, rest)
+  = go exp10 [] t
+      where
+        go :: LHsExpr
+           -> [LHsExpr]
+           -> LHsTerms
+           -> (Maybe (LHsExpr GhcPs), LHsTerms)
+        go firstExpr acc rest
+          | (Just qop, rest') <- check_qop rest
+          = case (check_exp10 rest') of
+              (Just exp10, rest'') -> go firstExpr (exp10 : qop : acc) rest''
+              otherwise -> (Nothing, rest')
+          | otherwise
+          = (Just (build_opapps firstExpr (reverse acc)), rest)
+        build_opapps firstExpr [] = firstExpr
+        build_opapps firstExpr (exp10 : qop : rest) = sLL rest' exp10 $ (OpApp noExt rest' qop exp10)
+          where rest' = (build_opapps firstExpr rest)
+
 check_infixexp rest = (Nothing, rest)
 
 -- ############ Check function for `infixexp_top`: ############
 check_infixexp_top :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
 check_infixexp_top t
-  | (Just exp10_top, rest) <- check_exp10_top t = (Just exp10_top, rest)    -- exp10
-check_infixexp_top -- TODO
+  | (Just exp10_top, rest) <- check_exp10_top t
+  = go exp10_top [] t
+      where
+        go :: LHsExpr
+           -> [LHsExpr]
+           -> LHsTerms
+           -> (Maybe (LHsExpr GhcPs), LHsTerms)
+        go firstExpr acc rest
+          | (Just qop, rest') <- check_qop rest
+          = case (check_exp10_top rest') of
+              (Just exp10_top, rest'') -> go firstExpr (exp10_top : qop : acc) rest''
+              otherwise -> (Nothing, rest')
+          | otherwise
+          = (Just (build_opapps firstExpr (reverse acc)), rest)
+        build_opapps firstExpr [] = firstExpr
+        build_opapps firstExpr (exp10_top : qop : rest) = sLL rest' exp10_top $ (OpApp noExt rest' qop exp10_top)
+          where rest' = (build_opapps firstExpr rest)
+
 check_infixexp_top rest = (Nothing, rest)
+
+-- ############ Check function for `qop`: ############
+check_qop :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
+check_qop
 
 -- ############ Check function for `exp10`: ############
 check_exp10 :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
@@ -3900,7 +3931,7 @@ fexp_go firstExpr acc rest
   = fexp_go firstExpr (TAppArg atp : acc) rest'
   | (Just aexp', rest') <- check_aexp rest
   = fexp_go firstExpr (ValArg aexp' : acc) rest'
-  | otherwise = Just (build_apps firstExpr (reverse acc))
+  | otherwise = (Just (build_apps firstExpr (reverse acc)), rest)
 
 build_apps firstExpr [] = firstExpr
 build_apps firstExpr (ValArg  e : es) = sLL es' e $ HsApp es' e
