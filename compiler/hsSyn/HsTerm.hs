@@ -402,6 +402,9 @@ allow the typechecker to obtain the correct GlobalRdrEnv.  Clearly, the simplest
 information to use is the GlobalRdrEnv itself.
 -}
 
+-- data structure for check_fexp
+--data HsArg = ValArg (HsExpr GhcPs) | TypeArg (HsExpr GhcPs)
+
 data HsTerm
   = HsParTerm
           LHsTerms
@@ -435,7 +438,7 @@ data HsTerm
   | HsStaticTerm
           (LHsExpr GhcPs)
   | HsTypeAppTerm
-          LHsTerms   -- `terms`
+          --LHsTerms   -- `terms`
           (LHsType GhcPs)  -- `atype`
   | HsDollarParenTerm     -- '$(' exp ')'
           (LHsExpr GhcPs)
