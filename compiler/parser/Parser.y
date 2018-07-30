@@ -3897,6 +3897,21 @@ check_qop t
   | x@(Just _, _) <- check_qconsym t = x                                                    -- qconsym
 check_qop ((L sp (HsBacktickTerm t) : rest)
 check_qop ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm))) : rest) = L sp $ EWildPat noExt   -- '`' '_' '`'
+check_qop rest = (Nothing, rest)
+
+-- ############ Check function for `qopm`: ############
+check_qopm :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
+-- Same as qop, but we filter out minus signs here:
+check_qopm rest@((L _ (HsGenName (L _ MinusSignData _)))) = (Nothing, rest)
+check_qopm ((L sp (HsBacktickTerm t) : rest)
+  | (Just qvarid, []]) <- check_qvarid t = L sp $ (unloc qvarid)                            -- '`' qvarid '`'
+  | (Just qconid, []]) <- check_qconid t = L sp $ (unloc qconid)                            -- '`' qconid '`'
+check_qopm t
+  | x@(Just _, _) <- check_qvarsym t = x                                                    -- qvarsym
+  | x@(Just _, _) <- check_qconsym t = x                                                    -- qconsym
+check_qopm ((L sp (HsBacktickTerm t) : rest)
+check_qopm ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm))) : rest) = L sp $ EWildPat noExt   -- '`' '_' '`'
+check_qopm rest = (Nothing, rest)
 
 -- ############ Check function for `exp10`: ############
 check_exp10 :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
@@ -4024,13 +4039,13 @@ check_aexp2 ((L sp (HsThTyQuoteTerm (L _ (HsGenName (SpecialSymData specialSym))
   = if specialSym == fsLit "." then (Just (L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp))), rest) else error "don't know"
 
 check_aexp2 ((L sp (HsThTyQuoteTerm htqt)) : rest)
-  | (L _ (HsGanName (VaridData vd)))         <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName vd))), rest)     -- VARID in tyvarid
-  | (L _ (HsGanName (SpecialIdData sd)))     <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))), rest)     -- special_id in tyvarid
-  | (L _ (HsGanName (UnsafeData ud)))        <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))), rest)     -- 'unsafe' in tyvarid
-  | (L _ (HsGanName (SafeData safed)))       <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName safed))), rest)  -- 'safe' in tyvarid
-  | (L _ (HsGanName (InterruptibleData id))) <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName id))), rest)     -- 'interruptible' in tyvarid
-  | (L _ (HsGanName (QConidData qd)))        <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qd))), rest)    -- 'QCONID' in qtycon (oqtycon, ntgtycon, gtycon)
-  | (L _ (HsGanName (ConidData cd)))         <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName cd))), rest)  -- 'CONID' in tycon (qtycon, oqtycon, ntgtycon, gtycon)
+  | (L _ (HsGenName (VaridData vd)))         <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName vd))), rest)     -- VARID in tyvarid
+  | (L _ (HsGenName (SpecialIdData sd)))     <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))), rest)     -- special_id in tyvarid
+  | (L _ (HsGenName (UnsafeData ud)))        <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd))), rest)     -- 'unsafe' in tyvarid
+  | (L _ (HsGenName (SafeData safed)))       <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName safed))), rest)  -- 'safe' in tyvarid
+  | (L _ (HsGenName (InterruptibleData id))) <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName id))), rest)     -- 'interruptible' in tyvarid
+  | (L _ (HsGenName (QConidData qd)))        <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qd))), rest)    -- 'QCONID' in qtycon (oqtycon, ntgtycon, gtycon)
+  | (L _ (HsGenName (ConidData cd)))         <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName cd))), rest)  -- 'CONID' in tycon (qtycon, oqtycon, ntgtycon, gtycon)
   | (L _ (HsParTerm [])) <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (getRdrName unitTyCon))), rest)                -- '(' ')' in gtycon
   | (L _ (HsParTerm (L _ (HsGenName (L _ (ArrowData _))))))      <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False (getRdrName funTyCon))), rest)     -- '(' '->' ')' in ntgtycon (gtycon)
   | (L _ (HsParTerm (L _ (HsGenName (L _ (TwiddleData _))))))    <- htqt = (Just (L sp $ HsBracket noExt (VarBr noExt False eqTyCon_RDR)), rest)               -- '(' '~' ')' in ntgtycon (gtycon)
@@ -4054,6 +4069,20 @@ check_aexp2 ((L sp (HsDecQuoteTerm dqt)) : rest)       = (Just (L sp $ HsBracket
 check_aexp2 ((L sp (HsParenBarTerm pbt1 pbt2)) : rest) = (Just (L sp $ HsArrForm noExt pbt1 Nothing (reverse pbt2)), rest)   -- '(|' aexp2 cmdargs '|)'
 
 check_aexp2 rest = (Nothing, rest)
+
+-- ######## Check function for texp: ########
+check_texp :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
+check_texp t
+  | ((Just infixexp, rest) <- check_infixexp t) && ((Just qop, rest') <- check_qop rest)
+  = sLL infixexp qop $ SectionL noExt infixexp qop
+  | ((Just qopm, rest) <- check_qopm t) && ((Just infixexp, rest') <- check_infixexp)
+  = sLL qopm infixexp $ SectionR noExt qop infixexp
+  | (Just exp, rest) <- check_exp t
+  = case rest of
+      ((L sp (HsGenName (ArrowData _))) : rest') -> case check_texp rest' of
+        (Just texp, rest'') -> sLL exp texp $ EViewPat noExt texp
+        otherwise -> (Just exp, rest)
+      otherwise -> (Just exp, rest)
 
 
 -- ######## Check function for qcon: ########
