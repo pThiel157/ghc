@@ -2614,7 +2614,7 @@ term      :: { LHsTerm }
           | '_'                           { sL1 $1 $ HsUnderscoreTerm }
           | list                          { sL1 $1 $ HsListTerm $1 } -- Is this right?
           | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
-          | gen_name                      { sL1 $1 $ HsGenName $1 }
+          | gen_name                      { sL1 $1 $ HsGenName (unloc $1) }
           -- need to add case: 'name' '@' pattern
           -- '_', ';', '|', '..'
 
@@ -3889,7 +3889,14 @@ check_infixexp_top rest = (Nothing, rest)
 
 -- ############ Check function for `qop`: ############
 check_qop :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
-check_qop
+check_qop ((L sp (HsBacktickTerm t) : rest)
+  | (Just qvarid, []]) <- check_qvarid t = L sp $ (unloc qvarid)                            -- '`' qvarid '`'
+  | (Just qconid, []]) <- check_qconid t = L sp $ (unloc qconid)                            -- '`' qconid '`'
+check_qop t
+  | x@(Just _, _) <- check_qvarsym t = x                                                    -- qvarsym
+  | x@(Just _, _) <- check_qconsym t = x                                                    -- qconsym
+check_qop ((L sp (HsBacktickTerm t) : rest)
+check_qop ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm))) : rest) = L sp $ EWildPat noExt   -- '`' '_' '`'
 
 -- ############ Check function for `exp10`: ############
 check_exp10 :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
@@ -4051,39 +4058,62 @@ check_aexp2 rest = (Nothing, rest)
 
 -- ######## Check function for qcon: ########
 check_qcon :: LHsTerms -> (Maybe (Located Rdrname), LHsTerms)
-check_qcon ((L sp (HsGenName (L _ (ConidData d)))) : rest)                           = (Just (L sp $ mkUnqual dataName d), rest) -- CONID in qcon
-check_qcon ((L sp (HsGenName (QConidData d))) : rest)                                = (Just (L sp $ mkQual dataName d), rest)   -- QCONID in qcon
-check_qcon ((L sp (HsParTerm ((L _ (HsGenName (L _ (ConsymData d)))) : [])) : rest)  = (Just (L sp $ mkUnqual varName d), rest)  -- '(' CONSYM ')' in qcon
-check_qcon ((L sp (HsParTerm ((L _ (HsGenName (L _ (ColonData d)))) : [])) : rest)   = (Just (L sp $ consDataCon_RDR), rest)     -- '(' ':' ')' in qcon
-check_qcon ((L sp (HsParTerm ((L _ (HsGenName (L _ (QConsymData d)))) : [])) : rest) = (Just (L sp $ mkQual dataName d), rest)   -- '(' QCONSYM ')' in qcon
-check_qcon ((L sp (HsParTerm []) : rest)    = (Just (L sp $ nameRdrName (dataConName unitDataCon)), rest)                        -- '(' ')' in qcon
-check_qcon ((L sp (HsBoxParTerm []) : rest) = (Just (L sp $ nameRdrName (dataConName unboxedUnitDataCon)), rest)                 -- '(#' '#)' in qcon
+check_qcon t
+  | x@(Just _, _) <- check_qconid t = x                                                                               -- qconid
+check_qcon ((L sp (HsParTerm t)) : rest)
+  | (Just qconsym, []) <- check_qconsym t = (Just (L sp $ unloc qconsym), rest)                                       -- '(' qconsym ')'
+check_qcon ((L sp (HsParTerm []) : rest)    = (Just (L sp $ nameRdrName (dataConName unitDataCon)), rest)             -- '(' ')' in qcon
+check_qcon ((L sp (HsBoxParTerm []) : rest) = (Just (L sp $ nameRdrName (dataConName unboxedUnitDataCon)), rest)      -- '(#' '#)' in qcon
 check_qcon ((L sp (HsTupParTerm ((L _ (HsTupCommas c)) : []))) : rest)
-    = (Just (L sp $ nameRdrName (dataConName (tupleDataCon Boxed (snd c + 1)))), rest)                                           --'(' commas ')' in qcon
+    = (Just (L sp $ nameRdrName (dataConName (tupleDataCon Boxed (snd c + 1)))), rest)                                --'(' commas ')' in qcon
 check_qcon ((L sp (HsBoxTupParTerm ((L _ (HsTupCommas tc)) : []))) : rest)
-    = (Just (L sp $ nameRdrName (dataConName $ tupleDataCon Unboxed (snd commas + 1))), rest)                                    -- '(#' commas '#)' in qcon
+    = (Just (L sp $ nameRdrName (dataConName $ tupleDataCon Unboxed (snd commas + 1))), rest)                         -- '(#' commas '#)' in qcon
 check_qcon ((L sp (HsBracketTerm []]) : rest)
-    = (Just (L sp (HsVar noExt $! nameRdrName (dataConName nilDataCon))), rest)                                                  -- '[' ']' in qcon
+    = (Just (L sp (HsVar noExt $! nameRdrName (dataConName nilDataCon))), rest)                                       -- '[' ']' in qcon
 check_qcon rest = (Nothing, rest)
--- -- ##########################################
 
 -- ######## Check function for qvar: ########
 check_qvar :: LHsTerms -> (Maybe (Located RdrName), LHsTerms)
-check_qvar ((L sp (HsGenName (VaridData d))) : rest)          = (Just (L sp $ mkUnqual varName d), rest)            -- VARID in qvar
-check_qvar ((L sp (HsGenName (SpecialIdData d))) : rest)      = (Just (L sp $ mkUnqual varName d), rest)            -- special_id in qvar
-check_qvar ((L sp (HsGenName (UnsafeData d))) : rest)         = (Just (L sp $ mkUnqual varName d), rest)            -- 'unsafe' in qvar
-check_qvar ((L sp (HsGenName (SafeData d))) : rest)           = (Just (L sp $ mkUnqual varName d), rest)            -- 'safe' in qvar
-check_qvar ((L sp (HsGenName (InterruptibleData d))) : rest)  = (Just (L sp $ mkUnqual varName d), rest)            -- 'interruptible' in qvar
-check_qvar ((L sp (HsGenName (ForallData d))) : rest)         = (Just (L sp $ mkUnqual varName d), rest)            -- 'forall' in qvar
-check_qvar ((L sp (HsGenName (FamilyData d))) : rest)         = (Just (L sp $ mkUnqual varName d), rest)            -- 'family' in qvar
-check_qvar ((L sp (HsGenName (RoleData d))) : rest)           = (Just (L sp $ mkUnqual varName d), rest)            -- 'role' in qvar
-check_qvar ((L sp (HsGenName (QVaridData d))) : rest)         = (Just (L sp $ mkQual varName d), rest)              -- QVARID in qvar
-check_qvar ((L sp (HsParTerm ((L _ HsGenName (QVarsymData d)) : []))) : rest)    = (Just $ L sp (mkQual varName d), rest)      --  '(' QVARYSM ')' in qvar
-check_qvar ((L sp (HsParTerm ((L _ HsGenName (VarsymData d)) : []))) : rest)     = (Just $ L sp (mkUnqual varName d), rest)    --  '(' VARYSM ')' in qvar
-check_qvar ((L sp (HsParTerm ((L _ HsGenName (SpecialSymData d)) : []))) : rest) = (Just $ L sp (mkUnqual varName d), rest)    -- '(' special_sym ')' in qvar
-check_qvar ((L sp (HsParTerm ((L _ HsGenName (MinusSignData d)) : []))) : rest)  = (Just $ L sp (mkUnqual varName d), rest)    -- '(' '-' ')' in qvar
+check_qvar t
+  | x@(Just _, _) <- check_qvarid t = x                                 -- qvarid
+check_qvar ((L sp (HsParTerm t)))
+  | (Just qvarsym, []) <- check_qvarsym t = (Just (L sp $ unloc qvarsym), rest)
 check_qvar rest = (Nothing, rest)
--- -- ##########################################
+
+-- ######## Check function for qconid: ########
+check_qconid :: LHsTerms -> (Maybe (Located Rdrname), LHsTerms)
+check_qconid ((L sp (HsGenName (L _ (ConidData d)))) : rest) = (Just (L sp $ mkUnqual dataName d), rest)       -- CONID
+check_qconid ((L sp (HsGenName (QConidData d))) : rest)      = (Just (L sp $ mkQual dataName d), rest)         -- QCONID
+check_qconid rest = (Nothing, rest)
+
+-- ######## Check function for qvarid: ########
+check_qvarid :: LHsTerms -> (Maybe (Located RdrName), LHsTerms)
+check_qvarid ((L sp (HsGenName (VaridData d))) : rest)         = (Just (L sp $ mkUnqual varName d), rest)            -- VARID
+check_qvarid ((L sp (HsGenName (SpecialIdData d))) : rest)     = (Just (L sp $ mkUnqual varName d), rest)            -- special_id
+check_qvarid ((L sp (HsGenName (UnsafeData d))) : rest)        = (Just (L sp $ mkUnqual varName d), rest)            -- 'unsafe'
+check_qvarid ((L sp (HsGenName (SafeData d))) : rest)          = (Just (L sp $ mkUnqual varName d), rest)            -- 'safe'
+check_qvarid ((L sp (HsGenName (InterruptibleData d))) : rest) = (Just (L sp $ mkUnqual varName d), rest)            -- 'interruptible'
+check_qvarid ((L sp (HsGenName (ForallData d))) : rest)        = (Just (L sp $ mkUnqual varName d), rest)            -- 'forall'
+check_qvarid ((L sp (HsGenName (FamilyData d))) : rest)        = (Just (L sp $ mkUnqual varName d), rest)            -- 'family'
+check_qvarid ((L sp (HsGenName (RoleData d))) : rest)          = (Just (L sp $ mkUnqual varName d), rest)            -- 'role'
+check_qvarid ((L sp (HsGenName (QVaridData d))) : rest)        = (Just (L sp $ mkQual varName d), rest)              -- QVARID
+check_qvarid rest = (Nothing, rest)
+
+-- ######## Check function for qconsym: ########
+check_qconsym :: LHsTerms -> (Maybe (Located RdrName), LHsTerms)
+check_qconsym ((L sp (HsGenName (QConsymData d))) : rest) = (Just (L sp $ mkQual dataName d), rest)         -- QCONSYM
+check_qconsym ((L sp (HsGenName (ConsymData d))) : rest)  = (Just (L sp $ mkUnqual dataName d), rest)       -- CONSYM
+check_qconsym ((L sp (HsGenName (ColonData d))) : rest)   = (Just (L sp $ consDataCon_RDR), rest)           -- ':'
+check_qconsym rest = (Nothing, rest)
+
+
+-- ######## Check function for qvarsym: ########
+check_qvarsym :: LHsTerms -> (Maybe (Located RdrName), LHsTerms)
+check_qvarsym ((L sp (HsGenName (QVarsymData d))) : rest)    = (Just (L sp $ mkQual varName d), rest)      -- QVARYSM
+check_qvarsym ((L sp (HsGenName (VarsymData d))) : rest)     = (Just (L sp $ mkUnqual varName d), rest)    -- VARYSM
+check_qvarsym ((L sp (HsGenName (SpecialSymData d))) : rest) = (Just (L sp $ mkUnqual varName d), rest)    -- special_sym
+check_qvarsym ((L sp (HsGenName (MinusSignData d))) : rest)  = (Just (L sp $ mkUnqual varName d), rest)    -- ''-'
+check_qvarsym rest = (Nothing, rest)
 
 
 
