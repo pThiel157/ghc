@@ -2592,7 +2592,7 @@ term      :: { LHsTerm }
           | '[p|' infixexp '|]'           { sLL $1 $> $ HsPatQuoteTerm $2 }
           | '[d|' cvtopbody '|]'          { sLL $1 $> $ HsDecQuoteTerm $2 }
           | '(|' aexp2 cmdargs '|)'       { sLL $1 $> $ HsParenBarTerm $2 $3 }
-          | aexp1 '{' fbinds '}'          { sLL $1 $> $ HsFBindsTerm $1 $3 }     -- for fbinds inside of aexp1
+          | '{' fbinds '}'                { sLL $1 $> $ HsFBindsTerm $2 }     -- for fbinds inside of aexp1
           | 'let' binds 'in' exp          { sLL $1 $> $ HsLetTerm $2 $4 }
           | 'if' exp optSemi 'then' exp optSemi 'else' exp
                                           {% checkDoAndIfThenElse $2 (snd $3) $5 (snd $6) $8 >>
@@ -3845,7 +3845,7 @@ check_exp rest = (Nothing, rest)
 check_infixexp :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
 check_infixexp t
   | (Just exp10, rest) <- check_exp10 t --(Just exp10, rest)
-  = go exp10 [] t
+  = go exp10 [] rest
       where
         go :: LHsExpr
            -> [LHsExpr]
@@ -3868,7 +3868,7 @@ check_infixexp rest = (Nothing, rest)
 check_infixexp_top :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
 check_infixexp_top t
   | (Just exp10_top, rest) <- check_exp10_top t
-  = go exp10_top [] t
+  = go exp10_top [] rest
       where
         go :: LHsExpr
            -> [LHsExpr]
@@ -3994,12 +3994,20 @@ check_aexp rest = (Nothing, rest)                                            -- 
 
 -- ############ Check function for `aexp1`: ############
 check_aexp1 :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
--- TODO: ask Richard on case
-check_aexp1 ((L sp (HsFBindsTerm aexp1 fbt)) : rest) = {- Just (% do ( r <- mkRecConstrOrUpdate aexp1 sp
-                                                                                         (snd fbt)
-                                                           ; checkRecordSyntax (L sp r) )) -}
-check_aexp1 ts
-  | (Just aexp2, rest) <- check_aexp2 ts = (Just aexp2, rest)
+check_aexp1 t
+  | (Just aexp2, rest) <- check_aexp2 ts
+  = go aexp2 [] rest
+      where
+        go ::
+        go aexp2 acc rest
+          | ((L sp HsFBindsTerm fbinds) : rest') <- rest
+          = go aexp2 (fbinds : acc) rest'
+          | otherwise
+          = (Just (build aexp2 (reverse acc)), rest)
+        build aexp2 [] = aexp2
+        build aexp2 (fbinds : rest) = % do { r <- mkRecConstrOrUpdate rest' (getLoc fbinds)
+                                                                   (snd fbinds)
+                                           ; checkRecordSyntax (sLL rest' fbinds r) }
 
 check_aexp1 rest = (Nothing, rest)
 

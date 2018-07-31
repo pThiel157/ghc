@@ -458,7 +458,7 @@ data HsTerm
           (LHsExpr GhcPs)
           [LHsCmdTop GhcPs]
   | HsFBindsTerm
-          (LHsExpr GhcPs) ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))
+          ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))
   | HsLetTerm
           (Located ([AddAnn],Located (HsLocalBinds GhcPs)))
           (LHsExpr  GhcPs)
