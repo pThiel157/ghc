@@ -2656,18 +2656,18 @@ gen_name  :: { Located GenData }
           | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
 tup_terms :: { LHsTerms }  -- expression in texp and type-level from atype
-          : terms commas_tup_tail_terms   { (HsTermsInTup $1) : $2 }
-          | terms bars                    { [HsTermsInTup $1, HsTupBars $2] }
+          : terms commas_tup_tail_terms   { $1 : $2 }
+          | terms bars                    { [$1, HsTupBars $2] }
           | bar_terms2                    { [$1] } -- covers the case '(#' bar_types '#)' in atype
           | commas tup_tail_terms         { (HsTupCommas $1) :  $2}
-          | bars terms bars0              { [HsTupBars $1, HsTermsInTup $2, HsTupBars0 $3] }
+          | bars terms bars0              { [HsTupBars $1, $2, HsTupBars0 $3] }
 
 commas_tup_tail_terms :: { LHsTerms }
           : commas tup_tail_terms         { (HsTupCommas $1) : $2 }  -- [HsCommaTerm $1] ++ $2
 
 tup_tail_terms :: { LHsTerms }
-          : terms commas_tup_tail_terms   { (HsTermsInTup $1) : $2 }
-          | terms                         { [HsTermsInTup $1] }
+          : terms commas_tup_tail_terms   { $1 : $2 }
+          | terms                         { [$1] }
           | {- empty -}                   { [] } -- We might not need this case since terms can also boil down to {- empty -}
 
 bar_terms2 :: { LHsTerm }
@@ -4085,7 +4085,7 @@ check_texp t
   = sLL infixexp qop $ SectionL noExt infixexp qop
   | ((Just qopm, rest) <- check_qopm t) && ((Just infixexp, rest') <- check_infixexp)
   = sLL qopm infixexp $ SectionR noExt qop infixexp
-  | (Just exp, rest) <- check_exp t
+  | (Just exp, rest) <- check_exp `I`
   = case rest of
       ((L sp (HsGenName (ArrowData _))) : rest') -> case check_texp rest' of
         (Just texp, rest'') -> sLL exp texp $ EViewPat noExt texp
