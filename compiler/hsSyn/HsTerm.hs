@@ -43,6 +43,7 @@ import Util
 import Outputable
 import FastString
 import Type
+import HsExpr
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -71,8 +72,8 @@ data GenData = UnsafeData FastString
              | RoleData FastString
              | SpecialIdData FastString
              | LiteralData (HsLit GhcPs)
-             | IntegerData (HsOverLit GhsPs)
-             | RationalData (HsOverLit GhsPs)
+             | IntegerData (HsOverLit GhcPs)
+             | RationalData (HsOverLit GhcPs)
              | QConidData (FastString, FastString)
              | ConidData FastString
              | QConsymData (FastString, FastString)
@@ -85,7 +86,7 @@ data GenData = UnsafeData FastString
              | LabelVaridData FastString
              | ThIdSpliceData FastString
              | ThIdTySpliceData FastString
-             | QuasiquoteData (HsSplice GhsPs)
+             | QuasiquoteData (HsSplice GhcPs)
              | ColonData FastString
              | ArrowData FastString
              | TwiddleData FastString
@@ -101,21 +102,21 @@ mkFamilyData        :: FastString -> GenData
 mkRoleData          :: FastString -> GenData
 mkSpecialIdData     :: FastString -> GenData
 mkLiteralData       :: (HsLit GhcPs) -> GenData
-mkIntegerData       :: (HsOverLit GhsPs) -> GenData
-mkRationalData      :: (HsOverLit GhsPs) -> GenData
+mkIntegerData       :: (HsOverLit GhcPs) -> GenData
+mkRationalData      :: (HsOverLit GhcPs) -> GenData
 mkQConidData        :: (FastString, FastString) -> GenData
 mkConidData         :: FastString -> GenData
-mkQConsymData       :: (FastString, FastString) -> Gendata
-mkConsymData        :: FastString -> Gendata
+mkQConsymData       :: (FastString, FastString) -> GenData
+mkConsymData        :: FastString -> GenData
 mkQVaridData        ::  (FastString, FastString) -> GenData
-mkVaridData         :: FastString -> Gendata
-mkQVarsymData       :: (FastString, FastString) -> Gendata
-mkVarsymData        :: FastString -> Gendata
-mkIPDupVaridData    :: FastString -> Gendata
+mkVaridData         :: FastString -> GenData
+mkQVarsymData       :: (FastString, FastString) -> GenData
+mkVarsymData        :: FastString -> GenData
+mkIPDupVaridData    :: FastString -> GenData
 mkLabelVaridData    :: FastString -> GenData
 mkThIdSpliceData    :: FastString -> GenData
 mkThIdTySpliceData  :: FastString -> GenData
-mkQuasiquoteData    :: (HsSplice GhsPs) -> GenData
+mkQuasiquoteData    :: (HsSplice GhcPs) -> GenData
 mkColonData         :: FastString -> GenData
 mkArrowData         :: FastString -> GenData
 mkTwiddleData       :: FastString -> GenData
@@ -141,7 +142,7 @@ mkVaridData         = VaridData
 mkQVarsymData       = QVarsymData
 mkVarsymData        = VarsymData
 mkIPDupVaridData    = IPDupVaridData
-mkLabelVarid        = LabelVaridData
+mkLabelVaridData    = LabelVaridData
 mkThIdSpliceData    = ThIdSpliceData
 mkThIdTySpliceData  = ThIdTySpliceData
 mkQuasiquoteData    = QuasiquoteData
@@ -161,10 +162,10 @@ mkTwoFS (mfs, nfs) = TwoFS mfs nfs
 mkOneHsLit :: HsLit GhcPs -> GenData
 mkOneHsLit hsl = OneHsLit hsl
 
-mkOneHsOverLit :: (HsOverLit GhsPs) -> GenData
+mkOneHsOverLit :: (HsOverLit GhcPs) -> GenData
 mkOneHsOverLit hol = OneHsOverLit hol
 
-mkOneHsSplice :: (HsSplice GhsPs) -> GenData
+mkOneHsSplice :: (HsSplice GhcPs) -> GenData
 mkOneHsSplice hsl = OneHsSplice hsl
 
 
@@ -193,9 +194,11 @@ mkOneFracLit fl = OneFracLit fl
 -- * Terms proper
 
 -- | Located Haskell Term\
+
 type LHsTerms = [LHsTerm]
 
 type LHsTerm = Located HsTerm
+
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
   --   in a list
 
@@ -420,12 +423,12 @@ data HsTerm
           LHsTerms
   | HsArrAppTerm
           (LHsExpr GhcPs)
-          (LHsExpr GhsPs)
+          (LHsExpr GhcPs)
           HsArrAppType Bool
   | HsSccAnnTerm
           SourceText
           StringLiteral
-          (LHsExpr GhsPs)
+          (LHsExpr GhcPs)
   | HsTickPragmaTerm
           SourceText
           (StringLiteral,(Int,Int),(Int,Int))
@@ -480,7 +483,7 @@ data HsTerm
           LHsType
   | HsCaseTerm  -- 'case' exp 'of' altslist  -- exps
           (LHsExpr GhcPs)
-          (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)])
+          (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
   | HsDoTerm  -- 'do' stmtlist
           (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
   | HsMdoTerm  -- 'mdo' stmtlist
@@ -495,12 +498,19 @@ data HsTerm
   | HsStrictmarkTerm
           (Located ([AddAnn],HsSrcBang))
           LHsTerms
+  | HsUnpackednessTerm
+          (Located ([AddAnn], SourceText, SrcUnpackedness))
+          (LHsType GhcPs)
+  | HsUnpackednessStrictnessTerm
+          (Located ([AddAnn], SourceText, SrcUnpackedness))
+          (Located ([AddAnn], SrcStrictness))
+          (LHsType GhcPs)
   | HsAtTerm
           (Located RdrName)
-          (LHsExpr GhsPs)
+          (LHsExpr GhcPs)
   | HsUnderscoreTerm
   | HsListTerm
-          ([AddAnn],HsExpr GhcPs))
+          ([AddAnn],HsExpr GhcPs)
   | HsFatArrowTerm
           (LHsContext GhcPs)
           (LHsType GhcPs)
@@ -525,424 +535,424 @@ data HsTupTerm
   | HsJustCommas ([SrcSpan],Int)
 -}
 
-{-
--- | A Haskell term.
-data HsTerm p
-  = HsVar     (XVar p)
-              (Located (IdP p)) -- ^ Variable
 
-                             -- See Note [Located RdrNames]
+-- -- | A Haskell term.
+-- data HsTerm p
+--   = HsVar     (XVar p)
+--               (Located (IdP p)) -- ^ Variable
+--
+--                              -- See Note [Located RdrNames]
+--
+--   | HsUnboundVar (XUnboundVar p)
+--                  UnboundVar  -- ^ Unbound variable; also used for "holes"
+--                              --   (_ or _x).
+--                              -- Turned from HsVar to HsUnboundVar by the
+--                              --   renamer, when it finds an out-of-scope
+--                              --   variable or hole.
+--                              -- Turned into HsVar by type checker, to support
+--                              --   deferred type errors.
+--
+--   | HsConLikeOut (XConLikeOut p)
+--                  ConLike     -- ^ After typechecker only; must be different
+--                              -- HsVar for pretty printing
+--
+--   | HsRecFld  (XRecFld p)
+--               (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
+--                                     -- Not in use after typechecking
+--
+--   | HsOverLabel (XOverLabel p)
+--                 (Maybe (IdP p)) FastString
+--      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
+--      --   @Just id@ means @RebindableSyntax@ is in use, and gives the id of the
+--      --   in-scope 'fromLabel'.
+--      --   NB: Not in use after typechecking
+--
+--   | HsIPVar   (XIPVar p)
+--               HsIPName   -- ^ Implicit parameter (not in use after typechecking)
+--   | HsOverLit (XOverLitE p)
+--               (HsOverLit p)  -- ^ Overloaded literals
+--
+--   | HsLit     (XLitE p)
+--               (HsLit p)      -- ^ Simple (non-overloaded) literals
+--
+--   | HsLam     (XLam p)
+--               (MatchGroup p (LHsTerm p))
+--                        -- ^ Lambda abstraction. Currently always a single match
+--        --
+--        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
+--        --       'ApiAnnotation.AnnRarrow',
+--
+--        -- For details on above see note [Api annotations] in ApiAnnotation
+--
+--   | HsLamCase (XLamCase p) (MatchGroup p (LHsTerm p)) -- ^ Lambda-case
+--        --
+--        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
+--        --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
+--        --           'ApiAnnotation.AnnClose'
+--
+--        -- For details on above see note [Api annotations] in ApiAnnotation
+--
+--   | HsApp     (XApp p) (LHsTerm p) (LHsTerm p) -- ^ Application
+--
+--   | HsAppType (XAppTypeE p) (LHsTerm p)  -- ^ Visible type application
+--        --
+--        -- Explicit type argument; e.g  f @Int x y
+--        -- NB: Has wildcards, but no implicit quantification
+--        --
+--        -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt',
+--
+--   -- | Operator applications:
+--   -- NB Bracketed ops such as (+) come out as Vars.
+--
+--   -- NB We need an term for the operator in an OpApp/Section since
+--   -- the typechecker may need to apply the operator to a few types.
+--
+--   | OpApp       (XOpApp p)
+--                 (LHsTerm p)       -- left operand
+--                 (LHsTerm p)       -- operator
+--                 (LHsTerm p)       -- right operand
+--
+--   -- | Negation operator. Contains the negated term and the name
+--   -- of 'negate'
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnMinus'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | NegApp      (XNegApp p)
+--                 (LHsTerm p)
+--                 (SyntaxTerm p)
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
+--   --             'ApiAnnotation.AnnClose' @')'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsPar       (XPar p)
+--                 (LHsTerm p)  -- ^ Parenthesised term; see Note [Parens in HsSyn]
+--
+--   | SectionL    (XSectionL p)
+--                 (LHsTerm p)    -- operand; see Note [Sections in HsSyn]
+--                 (LHsTerm p)    -- operator
+--   | SectionR    (XSectionR p)
+--                 (LHsTerm p)    -- operator; see Note [Sections in HsSyn]
+--                 (LHsTerm p)    -- operand
+--
+--   -- | Used for explicit tuples and sections thereof
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+--   --         'ApiAnnotation.AnnClose'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | ExplicitTuple
+--         (XExplicitTuple p)
+--         [LHsTupArg p]
+--         Boxity
+--
+--   -- | Used for unboxed sum types
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(#'@,
+--   --          'ApiAnnotation.AnnVbar', 'ApiAnnotation.AnnClose' @'#)'@,
+--   --
+--   --  There will be multiple 'ApiAnnotation.AnnVbar', (1 - alternative) before
+--   --  the term, (arity - alternative) after it
+--   | ExplicitSum
+--           (XExplicitSum p)
+--           ConTag --  Alternative (one-based)
+--           Arity  --  Sum arity
+--           (LHsTerm p)
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
+--   --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
+--   --       'ApiAnnotation.AnnClose' @'}'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsCase      (XCase p)
+--                 (LHsTerm p)
+--                 (MatchGroup p (LHsTerm p))
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
+--   --       'ApiAnnotation.AnnSemi',
+--   --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
+--   --       'ApiAnnotation.AnnElse',
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsIf        (XIf p)
+--                 (Maybe (SyntaxTerm p)) -- cond function
+--                                         -- Nothing => use the built-in 'if'
+--                                         -- See Note [Rebindable if]
+--                 (LHsTerm p)    --  predicate
+--                 (LHsTerm p)    --  then part
+--                 (LHsTerm p)    --  else part
+--
+--   -- | Multi-way if
+--   --
+--   -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf'
+--   --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsMultiIf   (XMultiIf p) [LGRHS p (LHsTerm p)]
+--
+--   -- | let(rec)
+--   --
+--   -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
+--   --       'ApiAnnotation.AnnOpen' @'{'@,
+--   --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsLet       (XLet p)
+--                 (LHsLocalBinds p)
+--                 (LHsTerm  p)
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
+--   --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
+--   --             'ApiAnnotation.AnnVbar',
+--   --             'ApiAnnotation.AnnClose'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsDo        (XDo p)                  -- Type of the whole term
+--                 (HsStmtContext Name)     -- The parameterisation is unimportant
+--                                          -- because in this context we never use
+--                                          -- the PatGuard or ParStmt variant
+--                 (Located [TermLStmt p]) -- "do":one or more stmts
+--
+--   -- | Syntactic list: [a,b,c,...]
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
+--   --              'ApiAnnotation.AnnClose' @']'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | ExplicitList
+--                 (XExplicitList p)  -- Gives type of components of list
+--                 (Maybe (SyntaxTerm p))
+--                                    -- For OverloadedLists, the fromListN witness
+--                 [LHsTerm p]
+--
+--   -- | Record construction
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
+--   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | RecordCon
+--       { rcon_ext      :: XRecordCon p
+--       , rcon_con_name :: Located (IdP p)    -- The constructor name;
+--                                             --  not used after type checking
+--       , rcon_flds     :: HsRecordBinds p }  -- The fields
+--
+--   -- | Record update
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
+--   --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | RecordUpd
+--       { rupd_ext  :: XRecordUpd p
+--       , rupd_term :: LHsTerm p
+--       , rupd_flds :: [LHsRecUpdField p]
+--       }
+--   -- For a type family, the arg types are of the *instance* tycon,
+--   -- not the family tycon
+--
+--   -- | Term with an explicit type signature. @e :: type@
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | TermWithTySig
+--                 (XTermWithTySig p)   -- Retain the signature,
+--                                      -- as HsSigType Name, for
+--                                      -- round-tripping purposes
+--                 (LHsTerm p)
+--
+--   -- | Arithmetic sequence
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
+--   --              'ApiAnnotation.AnnComma','ApiAnnotation.AnnDotdot',
+--   --              'ApiAnnotation.AnnClose' @']'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | ArithSeq
+--                 (XArithSeq p)
+--                 (Maybe (SyntaxTerm p))
+--                                   -- For OverloadedLists, the fromList witness
+--                 (ArithSeqInfo p)
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsSCC       (XSCC p)
+--                 SourceText            -- Note [Pragma source text] in BasicTypes
+--                 StringLiteral         -- "set cost centre" SCC pragma
+--                 (LHsTerm p)           -- term whose cost is to be measured
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
+--   --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsCoreAnn   (XCoreAnn p)
+--                 SourceText            -- Note [Pragma source text] in BasicTypes
+--                 StringLiteral         -- hdaume: core annotation
+--                 (LHsTerm p)
+--
+--   -----------------------------------------------------------
+--   -- MetaHaskell Extensions
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+--   --         'ApiAnnotation.AnnOpenE','ApiAnnotation.AnnOpenEQ',
+--   --         'ApiAnnotation.AnnClose','ApiAnnotation.AnnCloseQ'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsBracket    (XBracket p) (HsBracket p)
+--
+--     -- See Note [Pending Splices]
+--   | HsRnBracketOut
+--       (XRnBracketOut p)
+--       (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
+--                            -- term, plus
+--       [PendingRnSplice]    -- _renamed_ splices to be type checked
+--
+--   | HsTcBracketOut
+--       (XTcBracketOut p)
+--       (HsBracket GhcRn)    -- Output of the type checker is the *original*
+--                            -- renamed term, plus
+--       [PendingTcSplice]    -- _typechecked_ splices to be
+--                            -- pasted back in by the desugarer
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+--   --         'ApiAnnotation.AnnClose'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsSpliceE  (XSpliceE p) (HsSplice p)
+--
+--   -----------------------------------------------------------
+--   -- Arrow notation extension
+--
+--   -- | @proc@ notation for Arrows
+--   --
+--   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnProc',
+--   --          'ApiAnnotation.AnnRarrow'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsProc      (XProc p)
+--                 (LPat p)               -- arrow abstraction, proc
+--                 (LHsCmdTop p)          -- body of the abstraction
+--                                        -- always has an empty stack
+--
+--   ---------------------------------------
+--   -- static pointers extension
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnStatic',
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsStatic (XStatic p) -- Free variables of the body
+--              (LHsTerm p)        -- Body
+--
+--   ---------------------------------------
+--   -- The following are commands, not terms proper
+--   -- They are only used in the parsing stage and are removed
+--   --    immediately in parser.RdrHsSyn.checkCommand
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
+--   --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
+--   --          'ApiAnnotation.AnnRarrowtail'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
+--         (XArrApp p)     -- type of the arrow terms f,
+--                         -- of the form a t t', where arg :: t
+--         (LHsTerm p)     -- arrow term, f
+--         (LHsTerm p)     -- input term, arg
+--         HsArrAppType    -- higher-order (-<<) or first-order (-<)
+--         Bool            -- True => right-to-left (f -< arg)
+--                         -- False => left-to-right (arg >- f)
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpenB' @'(|'@,
+--   --         'ApiAnnotation.AnnCloseB' @'|)'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
+--         (XArrForm p)
+--         (LHsTerm p)      -- the operator
+--                          -- after type-checking, a type abstraction to be
+--                          -- applied to the type of the local environment tuple
+--         (Maybe Fixity)   -- fixity (filled in by the renamer), for forms that
+--                          -- were converted from OpApp's by the renamer
+--         [LHsCmdTop p]    -- argument commands
+--
+--   ---------------------------------------
+--   -- Haskell program coverage (Hpc) Support
+--
+--   | HsTick
+--      (XTick p)
+--      (Tickish (IdP p))
+--      (LHsTerm p)                       -- sub-term
+--
+--   | HsBinTick
+--      (XBinTick p)
+--      Int                                -- module-local tick number for True
+--      Int                                -- module-local tick number for False
+--      (LHsTerm p)                        -- sub-term
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+--   --       'ApiAnnotation.AnnOpen' @'{-\# GENERATED'@,
+--   --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnVal',
+--   --       'ApiAnnotation.AnnColon','ApiAnnotation.AnnVal',
+--   --       'ApiAnnotation.AnnMinus',
+--   --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnColon',
+--   --       'ApiAnnotation.AnnVal',
+--   --       'ApiAnnotation.AnnClose' @'\#-}'@
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | HsTickPragma                      -- A pragma introduced tick
+--      (XTickPragma p)
+--      SourceText                       -- Note [Pragma source text] in BasicTypes
+--      (StringLiteral,(Int,Int),(Int,Int))
+--                                       -- external span for this tick
+--      ((SourceText,SourceText),(SourceText,SourceText))
+--         -- Source text for the four integers used in the span.
+--         -- See note [Pragma source text] in BasicTypes
+--      (LHsTerm p)
+--
+--   ---------------------------------------
+--   -- These constructors only appear temporarily in the parser.
+--   -- The renamer translates them into the Right Thing.
+--
+--   | EWildPat (XEWildPat p)        -- wildcard
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | EAsPat      (XEAsPat p)
+--                 (Located (IdP p)) -- as pattern
+--                 (LHsTerm p)
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | EViewPat    (XEViewPat p)
+--                 (LHsTerm p) -- view pattern
+--                 (LHsTerm p)
+--
+--   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
+--
+--   -- For details on above see note [Api annotations] in ApiAnnotation
+--   | ELazyPat    (XELazyPat p) (LHsTerm p) -- ~ pattern
+--
+--
+--   ---------------------------------------
+--   -- Finally, HsWrap appears only in typechecker output
+--   -- The contained Term is *NOT* itself an HsWrap.
+--   -- See Note [Detecting forced eta expansion] in DsTerm. This invariant
+--   -- is maintained by HsUtils.mkHsWrap.
+--
+--   |  HsWrap     (XWrap p)
+--                 HsWrapper    -- TRANSLATION
+--                 (HsTerm p)
+--
+--   | XTerm       (XXTerm p) -- Note [Trees that Grow] extension constructor
+--
+-- --EF
+--   | TArrow      (XTArrow p)
+--   | TTwiddle    (XTTwiddle p)
+--   | Star        (XStar p)
+-- --EF
 
-  | HsUnboundVar (XUnboundVar p)
-                 UnboundVar  -- ^ Unbound variable; also used for "holes"
-                             --   (_ or _x).
-                             -- Turned from HsVar to HsUnboundVar by the
-                             --   renamer, when it finds an out-of-scope
-                             --   variable or hole.
-                             -- Turned into HsVar by type checker, to support
-                             --   deferred type errors.
-
-  | HsConLikeOut (XConLikeOut p)
-                 ConLike     -- ^ After typechecker only; must be different
-                             -- HsVar for pretty printing
-
-  | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-                                    -- Not in use after typechecking
-
-  | HsOverLabel (XOverLabel p)
-                (Maybe (IdP p)) FastString
-     -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
-     --   @Just id@ means @RebindableSyntax@ is in use, and gives the id of the
-     --   in-scope 'fromLabel'.
-     --   NB: Not in use after typechecking
-
-  | HsIPVar   (XIPVar p)
-              HsIPName   -- ^ Implicit parameter (not in use after typechecking)
-  | HsOverLit (XOverLitE p)
-              (HsOverLit p)  -- ^ Overloaded literals
-
-  | HsLit     (XLitE p)
-              (HsLit p)      -- ^ Simple (non-overloaded) literals
-
-  | HsLam     (XLam p)
-              (MatchGroup p (LHsTerm p))
-                       -- ^ Lambda abstraction. Currently always a single match
-       --
-       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
-       --       'ApiAnnotation.AnnRarrow',
-
-       -- For details on above see note [Api annotations] in ApiAnnotation
-
-  | HsLamCase (XLamCase p) (MatchGroup p (LHsTerm p)) -- ^ Lambda-case
-       --
-       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
-       --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
-       --           'ApiAnnotation.AnnClose'
-
-       -- For details on above see note [Api annotations] in ApiAnnotation
-
-  | HsApp     (XApp p) (LHsTerm p) (LHsTerm p) -- ^ Application
-
-  | HsAppType (XAppTypeE p) (LHsTerm p)  -- ^ Visible type application
-       --
-       -- Explicit type argument; e.g  f @Int x y
-       -- NB: Has wildcards, but no implicit quantification
-       --
-       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt',
-
-  -- | Operator applications:
-  -- NB Bracketed ops such as (+) come out as Vars.
-
-  -- NB We need an term for the operator in an OpApp/Section since
-  -- the typechecker may need to apply the operator to a few types.
-
-  | OpApp       (XOpApp p)
-                (LHsTerm p)       -- left operand
-                (LHsTerm p)       -- operator
-                (LHsTerm p)       -- right operand
-
-  -- | Negation operator. Contains the negated term and the name
-  -- of 'negate'
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnMinus'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | NegApp      (XNegApp p)
-                (LHsTerm p)
-                (SyntaxTerm p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-  --             'ApiAnnotation.AnnClose' @')'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsPar       (XPar p)
-                (LHsTerm p)  -- ^ Parenthesised term; see Note [Parens in HsSyn]
-
-  | SectionL    (XSectionL p)
-                (LHsTerm p)    -- operand; see Note [Sections in HsSyn]
-                (LHsTerm p)    -- operator
-  | SectionR    (XSectionR p)
-                (LHsTerm p)    -- operator; see Note [Sections in HsSyn]
-                (LHsTerm p)    -- operand
-
-  -- | Used for explicit tuples and sections thereof
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnClose'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | ExplicitTuple
-        (XExplicitTuple p)
-        [LHsTupArg p]
-        Boxity
-
-  -- | Used for unboxed sum types
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(#'@,
-  --          'ApiAnnotation.AnnVbar', 'ApiAnnotation.AnnClose' @'#)'@,
-  --
-  --  There will be multiple 'ApiAnnotation.AnnVbar', (1 - alternative) before
-  --  the term, (arity - alternative) after it
-  | ExplicitSum
-          (XExplicitSum p)
-          ConTag --  Alternative (one-based)
-          Arity  --  Sum arity
-          (LHsTerm p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
-  --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
-  --       'ApiAnnotation.AnnClose' @'}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsCase      (XCase p)
-                (LHsTerm p)
-                (MatchGroup p (LHsTerm p))
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
-  --       'ApiAnnotation.AnnSemi',
-  --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
-  --       'ApiAnnotation.AnnElse',
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsIf        (XIf p)
-                (Maybe (SyntaxTerm p)) -- cond function
-                                        -- Nothing => use the built-in 'if'
-                                        -- See Note [Rebindable if]
-                (LHsTerm p)    --  predicate
-                (LHsTerm p)    --  then part
-                (LHsTerm p)    --  else part
-
-  -- | Multi-way if
-  --
-  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf'
-  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsMultiIf   (XMultiIf p) [LGRHS p (LHsTerm p)]
-
-  -- | let(rec)
-  --
-  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
-  --       'ApiAnnotation.AnnOpen' @'{'@,
-  --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsLet       (XLet p)
-                (LHsLocalBinds p)
-                (LHsTerm  p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
-  --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
-  --             'ApiAnnotation.AnnVbar',
-  --             'ApiAnnotation.AnnClose'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsDo        (XDo p)                  -- Type of the whole term
-                (HsStmtContext Name)     -- The parameterisation is unimportant
-                                         -- because in this context we never use
-                                         -- the PatGuard or ParStmt variant
-                (Located [TermLStmt p]) -- "do":one or more stmts
-
-  -- | Syntactic list: [a,b,c,...]
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-  --              'ApiAnnotation.AnnClose' @']'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | ExplicitList
-                (XExplicitList p)  -- Gives type of components of list
-                (Maybe (SyntaxTerm p))
-                                   -- For OverloadedLists, the fromListN witness
-                [LHsTerm p]
-
-  -- | Record construction
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
-  --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | RecordCon
-      { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: Located (IdP p)    -- The constructor name;
-                                            --  not used after type checking
-      , rcon_flds     :: HsRecordBinds p }  -- The fields
-
-  -- | Record update
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
-  --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | RecordUpd
-      { rupd_ext  :: XRecordUpd p
-      , rupd_term :: LHsTerm p
-      , rupd_flds :: [LHsRecUpdField p]
-      }
-  -- For a type family, the arg types are of the *instance* tycon,
-  -- not the family tycon
-
-  -- | Term with an explicit type signature. @e :: type@
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | TermWithTySig
-                (XTermWithTySig p)   -- Retain the signature,
-                                     -- as HsSigType Name, for
-                                     -- round-tripping purposes
-                (LHsTerm p)
-
-  -- | Arithmetic sequence
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-  --              'ApiAnnotation.AnnComma','ApiAnnotation.AnnDotdot',
-  --              'ApiAnnotation.AnnClose' @']'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | ArithSeq
-                (XArithSeq p)
-                (Maybe (SyntaxTerm p))
-                                  -- For OverloadedLists, the fromList witness
-                (ArithSeqInfo p)
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsSCC       (XSCC p)
-                SourceText            -- Note [Pragma source text] in BasicTypes
-                StringLiteral         -- "set cost centre" SCC pragma
-                (LHsTerm p)           -- term whose cost is to be measured
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
-  --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsCoreAnn   (XCoreAnn p)
-                SourceText            -- Note [Pragma source text] in BasicTypes
-                StringLiteral         -- hdaume: core annotation
-                (LHsTerm p)
-
-  -----------------------------------------------------------
-  -- MetaHaskell Extensions
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnOpenE','ApiAnnotation.AnnOpenEQ',
-  --         'ApiAnnotation.AnnClose','ApiAnnotation.AnnCloseQ'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsBracket    (XBracket p) (HsBracket p)
-
-    -- See Note [Pending Splices]
-  | HsRnBracketOut
-      (XRnBracketOut p)
-      (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
-                           -- term, plus
-      [PendingRnSplice]    -- _renamed_ splices to be type checked
-
-  | HsTcBracketOut
-      (XTcBracketOut p)
-      (HsBracket GhcRn)    -- Output of the type checker is the *original*
-                           -- renamed term, plus
-      [PendingTcSplice]    -- _typechecked_ splices to be
-                           -- pasted back in by the desugarer
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnClose'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsSpliceE  (XSpliceE p) (HsSplice p)
-
-  -----------------------------------------------------------
-  -- Arrow notation extension
-
-  -- | @proc@ notation for Arrows
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnProc',
-  --          'ApiAnnotation.AnnRarrow'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsProc      (XProc p)
-                (LPat p)               -- arrow abstraction, proc
-                (LHsCmdTop p)          -- body of the abstraction
-                                       -- always has an empty stack
-
-  ---------------------------------------
-  -- static pointers extension
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnStatic',
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsStatic (XStatic p) -- Free variables of the body
-             (LHsTerm p)        -- Body
-
-  ---------------------------------------
-  -- The following are commands, not terms proper
-  -- They are only used in the parsing stage and are removed
-  --    immediately in parser.RdrHsSyn.checkCommand
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
-  --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
-  --          'ApiAnnotation.AnnRarrowtail'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsArrApp             -- Arrow tail, or arrow application (f -< arg)
-        (XArrApp p)     -- type of the arrow terms f,
-                        -- of the form a t t', where arg :: t
-        (LHsTerm p)     -- arrow term, f
-        (LHsTerm p)     -- input term, arg
-        HsArrAppType    -- higher-order (-<<) or first-order (-<)
-        Bool            -- True => right-to-left (f -< arg)
-                        -- False => left-to-right (arg >- f)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpenB' @'(|'@,
-  --         'ApiAnnotation.AnnCloseB' @'|)'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
-        (XArrForm p)
-        (LHsTerm p)      -- the operator
-                         -- after type-checking, a type abstraction to be
-                         -- applied to the type of the local environment tuple
-        (Maybe Fixity)   -- fixity (filled in by the renamer), for forms that
-                         -- were converted from OpApp's by the renamer
-        [LHsCmdTop p]    -- argument commands
-
-  ---------------------------------------
-  -- Haskell program coverage (Hpc) Support
-
-  | HsTick
-     (XTick p)
-     (Tickish (IdP p))
-     (LHsTerm p)                       -- sub-term
-
-  | HsBinTick
-     (XBinTick p)
-     Int                                -- module-local tick number for True
-     Int                                -- module-local tick number for False
-     (LHsTerm p)                        -- sub-term
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --       'ApiAnnotation.AnnOpen' @'{-\# GENERATED'@,
-  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnColon','ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnMinus',
-  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnColon',
-  --       'ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnClose' @'\#-}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsTickPragma                      -- A pragma introduced tick
-     (XTickPragma p)
-     SourceText                       -- Note [Pragma source text] in BasicTypes
-     (StringLiteral,(Int,Int),(Int,Int))
-                                      -- external span for this tick
-     ((SourceText,SourceText),(SourceText,SourceText))
-        -- Source text for the four integers used in the span.
-        -- See note [Pragma source text] in BasicTypes
-     (LHsTerm p)
-
-  ---------------------------------------
-  -- These constructors only appear temporarily in the parser.
-  -- The renamer translates them into the Right Thing.
-
-  | EWildPat (XEWildPat p)        -- wildcard
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | EAsPat      (XEAsPat p)
-                (Located (IdP p)) -- as pattern
-                (LHsTerm p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | EViewPat    (XEViewPat p)
-                (LHsTerm p) -- view pattern
-                (LHsTerm p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | ELazyPat    (XELazyPat p) (LHsTerm p) -- ~ pattern
-
-
-  ---------------------------------------
-  -- Finally, HsWrap appears only in typechecker output
-  -- The contained Term is *NOT* itself an HsWrap.
-  -- See Note [Detecting forced eta expansion] in DsTerm. This invariant
-  -- is maintained by HsUtils.mkHsWrap.
-
-  |  HsWrap     (XWrap p)
-                HsWrapper    -- TRANSLATION
-                (HsTerm p)
-
-  | XTerm       (XXTerm p) -- Note [Trees that Grow] extension constructor
-
---EF
-  | TArrow      (XTArrow p)
-  | TTwiddle    (XTTwiddle p)
-  | Star        (XStar p)
---EF
--}
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
 data RecordConTc = RecordConTc
@@ -1058,9 +1068,9 @@ type instance XELazyPat      (GhcPass _) = NoExt
 type instance XWrap          (GhcPass _) = NoExt
 type instance XXTerm         (GhcPass _) = NoExt
 --EF
-type instance XTArrow        (GhcPass _) = NoExt
-type instance XTTwiddle      (GhcPass _) = NoExt
-type instance XStar          (GhcPass _) = NoExt
+-- type instance XTArrow        (GhcPass _) = NoExt
+-- type instance XTTwiddle      (GhcPass _) = NoExt
+-- type instance XStar          (GhcPass _) = NoExt
 --EF
 
 -- ---------------------------------------------------------------------
@@ -1421,9 +1431,9 @@ ppr_term (HsArrForm _ op _ args)
 ppr_term (HsRecFld _ f) = ppr f
 ppr_term (XTerm x) = ppr x
 --EF
-ppr_term (TArrow   _) = parens arrow
-ppr_term (TTwiddle _) = parens $ char '~'
-ppr_term (Star     _) = --Todo
+-- ppr_term (TArrow   _) = parens arrow
+-- ppr_term (TTwiddle _) = parens $ char '~'
+-- ppr_term (Star     _) = --Todo
 --EF
 
 

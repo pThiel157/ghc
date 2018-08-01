@@ -2304,7 +2304,7 @@ There's an awkward overlap with a type signature.  Consider
   We can't tell whether to reduce var to qvar until after we've read the signatures.
 -}
 
-[t1, t2, t3, t4, t5]
+-- [t1, t2, t3, t4, t5]
 
 docdecl :: { LHsDecl GhcPs }
         : docdecld { sL1 $1 (DocD noExt (unLoc $1)) }
@@ -2561,7 +2561,7 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
 
 terms     :: { LHsTerms }
           -- : term                          { [$1] }
-          | term terms                    { $1 : $2 }
+          : term terms                    { $1 : $2 }
           | {- empty -}                   { [] }
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
@@ -2607,9 +2607,9 @@ term      :: { LHsTerm }
           | 'proc' aexp '->' exp          { sLL $1 $> $ HsProcTerm $2 $4 }
           | SIMPLEQUOTE terms             { sLL $1 $> $ HsSimplequoteTerm $2 }       -- How to encode these? They don't come with a FastString... make one ourselves?  -- generalized structure
           | TH_TY_QUOTE terms             { sLL $1 $> $ HsThTyQuoteTerm $2 } -- multiple fastStrings and a realsrcspan... what to do for right hand side?      -- generalized structure
-          | strict_mark terms             -- pattern or type
-          | unpackedness atype --type
-          | unpackedness strictness atype
+          | strict_mark terms             { sLL $1 $> $ HsStrictmarkTerm $1 $2 }
+          | unpackedness atype            { sLL $1 $> $ HsUnpackednessTerm $1 $2 }
+          | unpackedness strictness atype { sLL $1 $> $ HsUnpackednessStrictnessTerm $1 $2 $3 }
           | qvar '@' aexp                 { sLL $1 $> $ HsAtTerm $1 $3 }
           | '_'                           { sL1 $1 $ HsUnderscoreTerm }
           | list                          { sL1 $1 $ HsListTerm $1 } -- Is this right?
@@ -3943,7 +3943,7 @@ check_fexp ((L sp (HsStaticTerm saexp)) : rest)
 check_fexp rest = (Nothing, rest)
 
 -- helper functions:
-data HsArg = ValArg (HsExpr GhcPs) | TAppArg (HsExpr GhsPs)
+data HsArg = ValArg (HsExpr GhcPs) | TAppArg (HsExpr GhcPs)
 fexp_go :: LHsExpr
         -> [HsArg]
         -> LHsTerms
@@ -3993,19 +3993,19 @@ check_aexp rest = (Nothing, rest)                                            -- 
 
 
 -- ############ Check function for `aexp1`: ############
-check_aexp1 :: LHsTerms -> (Maybe (LHsExpr GhcPs), LHsTerms)
+check_aexp1 :: LHsTerms -> P (Maybe (LHsExpr GhcPs), LHsTerms)
 check_aexp1 t
   | (Just aexp2, rest) <- check_aexp2 ts
   = go aexp2 [] rest
       where
-        go ::
+        go :: -- TODO (make it return P sth)
         go aexp2 acc rest
           | ((L sp HsFBindsTerm fbinds) : rest') <- rest
           = go aexp2 (fbinds : acc) rest'
           | otherwise
           = (Just (build aexp2 (reverse acc)), rest)
         build aexp2 [] = aexp2
-        build aexp2 (fbinds : rest) = % do { r <- mkRecConstrOrUpdate rest' (getLoc fbinds)
+        build aexp2 (fbinds : rest) = do { r <- mkRecConstrOrUpdate rest' (getLoc fbinds)
                                                                    (snd fbinds)
                                            ; checkRecordSyntax (sLL rest' fbinds r) }
 
@@ -4163,8 +4163,7 @@ check_tup_exprs t
         _                          -> (Nothing, t)
   | ((HsTupCommas commas) : rest) <- t
   = case check_tup_tail rest of
-      (Just tup_tail, rest') -> (Just (% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (fst $1)
-                                            ; return ([],Tuple (map (\l -> L l missingTupArg) (fst $1) ++ $2)) }), rest')
+      (Just tup_tail, rest') -> (Just ([],Tuple (map (\l -> L l missingTupArg) (fst $1) ++ $2)), rest')
       _                      -> (Nothing, t)
   | ((HsTupBars bars) : rest) <- t
   = case check_texp rest of
