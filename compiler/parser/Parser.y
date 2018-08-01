@@ -4152,6 +4152,29 @@ check_qvarsym ((L sp (HsGenName (SpecialSymData d))) : rest) = (Just (L sp $ mkU
 check_qvarsym ((L sp (HsGenName (MinusSignData d))) : rest)  = (Just (L sp $ mkUnqual varName d), rest)    -- ''-'
 check_qvarsym rest = (Nothing, rest)
 
+-- ######## Check function for tup_exprs inside of aexp2: ########
+check_tup_exprs :: LHsTerms -> (Maybe ([AddAnn],SumOrTuple), LHsTerms)
+check_tup_exprs t
+  | (Just texp, rest@(HsTupCommas cms : _ )) <- check_texp t
+  = case (check_commas_tup_tail rest) of
+    (Just commas_exprs, rest') -> (([],Tuple ((sL1 texp (Present noExt texp)) : snd commas_exprs)), rest')
+    (Nothing, rest')           -> (Nothing, rest')
+-- TODO: similar for bars and other commas cases
+
+-- ######## Check function for `commas_tup_tail` & `tup_tail`: ########
+check_commas_tup_tail :: LHsTerms -> (Maybe (SrcSpan,[LHsTupArg GhcPs]), LHsTerms)
+check_commas_tup_tail (HsTupCommas commas : rest)
+  | (Just tup_tail, rest') <- check_tup_tail rest
+  = (Just (head $ fst commas ,(map (\l -> L l missingTupArg) (tail $ fst commas)) ++ tup_tail), rest')
+
+check_tup_tail :: LHsTerms -> (Maybe [LHsTupArg GhcPs], LHsTerms)
+check_tup_tail t
+  | (Just texp, [])   <- check_texp t = (Just [L (gl $1) (Present noExt $1)], [])
+  | Nothing           <- check_texp t = (Just [noLoc missingTupArg], [])
+  | (Just texp, rest@(HsTupCommas commas : xs)) <- check_texp t
+  = case (check_commas_tup_tail rest) of
+    (Just commasExpr, rest') -> (Just ((L (gl texp) (Present noExt texp)) : snd commasExpr), rest')
+    (Nothing, rest' )        -> (Nothing, rest')
 
 
 -- ######## old check function for qvar and qcon: ########
