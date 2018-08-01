@@ -506,15 +506,15 @@ data HsTerm
           (LHsType GhcPs)
   | HsGenName
           (Located GenData)
-  | HsTermsInTup
-          LHsTerms
   | HsTupCommas     -- wrap commas as LHsTerm type
           ([SrcSpan],Int)
   | HsBarTerms2
           [LHsTerms]
   | HsTupBars
           ([SrcSpan],Int)
-  -- | HsTupTerm
+-- | HsTermsInTup
+--         LHsTerms
+-- | HsTupTerm
   --         LHsTerms  -- a list of terms”
 
 {-
