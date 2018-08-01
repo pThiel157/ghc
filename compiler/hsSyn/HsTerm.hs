@@ -514,6 +514,8 @@ data HsTerm
           [LHsTerms]
   | HsTupBars
           ([SrcSpan],Int)
+  | HsTupBars0
+          ([SrcSpan],Int)
   -- | HsTupTerm
   --         LHsTerms  -- a list of terms”
 

@@ -2660,7 +2660,7 @@ tup_terms :: { LHsTerms }  -- expression in texp and type-level from atype
           | terms bars                    { [HsTermsInTup $1, HsTupBars $2] }
           | bar_terms2                    { [$1] } -- covers the case '(#' bar_types '#)' in atype
           | commas tup_tail_terms         { (HsTupCommas $1) :  $2}
-          | bars terms bars0              { [HsTupBars $1, HsTermsInTup $2, HsTupBars $3] }
+          | bars terms bars0              { [HsTupBars $1, HsTermsInTup $2, HsTupBars0 $3] }
 
 commas_tup_tail_terms :: { LHsTerms }
           : commas tup_tail_terms         { (HsTupCommas $1) : $2 }  -- [HsCommaTerm $1] ++ $2
@@ -4155,11 +4155,26 @@ check_qvarsym rest = (Nothing, rest)
 -- ######## Check function for tup_exprs inside of aexp2: ########
 check_tup_exprs :: LHsTerms -> (Maybe ([AddAnn],SumOrTuple), LHsTerms)
 check_tup_exprs t
-  | (Just texp, rest@(HsTupCommas cms : _ )) <- check_texp t
+  | (Just texp, rest) <- check_texp t
   = case (check_commas_tup_tail rest) of
-    (Just commas_exprs, rest') -> (([],Tuple ((sL1 texp (Present noExt texp)) : snd commas_exprs)), rest')
-    (Nothing, rest')           -> (Nothing, rest')
--- TODO: similar for bars and other commas cases
+      (Just commas_exprs, rest') -> (([],Tuple ((sL1 texp (Present noExt texp)) : snd commas_exprs)), rest')
+      _                          -> case rest of
+        ((HsTupBars bars) : rest') -> (Just (mvbars (fst bars), Sum 1  (snd bars + 1) texp), rest')
+        _                          -> (Nothing, t)
+  | ((HsTupCommas commas) : rest) <- t
+  = case check_tup_tail rest of
+      (Just tup_tail, rest') -> (Just (% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (fst $1)
+                                            ; return ([],Tuple (map (\l -> L l missingTupArg) (fst $1) ++ $2)) }), rest')
+      _                      -> (Nothing, t)
+  | ((HsTupBars bars) : rest) <- t
+  = case check_texp rest of
+      (Just texp, rest) -> case rest of
+        ((HsTupBars0 bars0) : rest') -> (Just (mvbars (fst bars) ++ mvbars (fst bars0), Sum (snd bars + 1) (snd bars + snd bars0 + 1) texp), )
+        _                            -> (Nothing, t)
+      _                 -> (Nothing, t)
+
+check_tup_exprs rest = (Nothing, rest)
+
 
 -- ######## Check function for `commas_tup_tail` & `tup_tail`: ########
 check_commas_tup_tail :: LHsTerms -> (Maybe (SrcSpan,[LHsTupArg GhcPs]), LHsTerms)
@@ -4167,14 +4182,24 @@ check_commas_tup_tail (HsTupCommas commas : rest)
   | (Just tup_tail, rest') <- check_tup_tail rest
   = (Just (head $ fst commas ,(map (\l -> L l missingTupArg) (tail $ fst commas)) ++ tup_tail), rest')
 
+check_commas_tup_tail rest = (Nothing, rest)
+
+
 check_tup_tail :: LHsTerms -> (Maybe [LHsTupArg GhcPs], LHsTerms)
 check_tup_tail t
-  | (Just texp, [])   <- check_texp t = (Just [L (gl $1) (Present noExt $1)], [])
-  | Nothing           <- check_texp t = (Just [noLoc missingTupArg], [])
-  | (Just texp, rest@(HsTupCommas commas : xs)) <- check_texp t
-  = case (check_commas_tup_tail rest) of
-    (Just commasExpr, rest') -> (Just ((L (gl texp) (Present noExt texp)) : snd commasExpr), rest')
-    (Nothing, rest' )        -> (Nothing, rest')
+  | (Just texp, rest) <- check_texp t
+  = case check_commas_tup_tail rest of
+      (Just ctt, rest') -> (Just ((L (gl texp) (Present noExt texp)) : snd ctt), rest')
+      (Nothing, _)      -> (Just [L (gl texp) (Present noExt texp)], rest)
+
+check_tup_tail rest = (Just [noLoc missingTupArg], rest)
+
+  -- | (Just texp, [])   <- check_texp t = (Just [L (gl $1) (Present noExt $1)], [])
+  -- | Nothing           <- check_texp t = (Just [noLoc missingTupArg], [])
+  -- | (Just texp, rest@(HsTupCommas commas : xs)) <- check_texp t
+  -- = case (check_commas_tup_tail rest) of
+  --   (Just commasExpr, rest') -> (Just ((L (gl texp) (Present noExt texp)) : snd commasExpr), rest')
+  --   (Nothing, rest' )        -> (Nothing, rest')
 
 
 -- ######## old check function for qvar and qcon: ########
