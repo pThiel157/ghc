@@ -53,6 +53,10 @@ import Data.Maybe (isNothing)
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
 
+-- importing libraries for different types
+import Lexer  -- for `AddAnn`
+import RdrName
+
 {-
 ************************************************************************
 *                                                                      *
@@ -198,6 +202,133 @@ mkOneFracLit fl = OneFracLit fl
 type LHsTerms = [LHsTerm]
 
 type LHsTerm = Located HsTerm
+
+
+
+-- data structure for check_fexp
+--data HsArg = ValArg (HsExpr GhcPs) | TypeArg (HsExpr GhcPs)
+
+data HsTerm
+  = HsParTerm
+          LHsTerms
+  | HsTupParTerm
+          LHsTerms
+  | HsBoxParTerm
+          LHsTerms
+  | HsBoxTupParTerm
+          LHsTerms
+  | HsBracketTerm
+          LHsTerms
+  | HsBacktickTerm
+          LHsTerms
+  | HsArrAppTerm
+          (LHsExpr GhcPs)
+          (LHsExpr GhcPs)
+          HsArrAppType Bool
+  | HsSccAnnTerm
+          SourceText
+          StringLiteral
+          (LHsExpr GhcPs)
+  | HsTickPragmaTerm
+          SourceText
+          (StringLiteral,(Int,Int),(Int,Int))
+          ((SourceText,SourceText),(SourceText,SourceText))
+          (LHsExpr GhcPs)
+  | HsCoreAnnTerm
+          SourceText
+          StringLiteral
+          (LHsExpr GhcPs)
+  | HsStaticTerm
+          (LHsExpr GhcPs)
+  | HsTypeAppTerm
+          --LHsTerms   -- `terms`
+          (LHsType GhcPs)  -- `atype`
+  | HsDollarParenTerm     -- '$(' exp ')'
+          (LHsExpr GhcPs)
+  | HsDoubleDollarParenTerm    -- '$$(' exp ')'
+          (LHsExpr GhcPs)
+  | HsExpQuoteTerm        -- '[|' exp '|]'
+          (LHsExpr GhcPs)
+  | HsTExpQuoteTerm       -- '[||' exp '||]'
+          (LHsExpr GhcPs)
+  | HsTypQuoteTerm        -- '[t|' ctype '|]'
+          (LHsType GhcPs)
+  | HsPatQuoteTerm        -- '[p|' infixexp '|]'
+          (LHsExpr GhcPs)
+  | HsDecQuoteTerm        -- '[d|' cvtopbody '|]'
+          ([AddAnn],[LHsDecl GhcPs])
+  | HsParenBarTerm
+          (LHsExpr GhcPs)
+          [LHsCmdTop GhcPs]
+  | HsFBindsTerm
+          ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))
+  | HsLetTerm
+          (Located ([AddAnn],Located (HsLocalBinds GhcPs)))
+          (LHsExpr  GhcPs)
+  | HsIfThenElseTerm      -- 'if' exp optSemi 'then' exp optSemi 'else' exp
+                          -- check here for semicolons
+          (LHsExpr GhcPs)   -- predicate
+          (LHsExpr GhcPs)   -- then case
+          (LHsExpr GhcPs)   -- else case
+  | HsOnlyIfTerm   -- 'if' ifgdpats
+          (Located ([AddAnn],[LGRHS GhcPs (LHsExpr GhcPs)]))
+  | HsLcaseTerm    -- '\\' 'lcase' altslist
+          (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+  | HsApatsArrowTerm  -- '\\' apat apats '->' exp
+          (LPat GhcPs)
+          [LPat GhcPs]
+          (LHsExpr GhcPs)
+  | HsDconTerm   -- terms '::' terms
+          LHsTerms
+          (LHsType GhcPs)
+  | HsCaseTerm  -- 'case' exp 'of' altslist  -- exps
+          (LHsExpr GhcPs)
+          (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+  | HsDoTerm  -- 'do' stmtlist
+          (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
+  | HsMdoTerm  -- 'mdo' stmtlist
+          (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
+  | HsProcTerm  -- 'proc' aexp '->' exp
+          (LHsExpr GhcPs)
+          (LHsExpr GhcPs)
+  | HsSimplequoteTerm  -- SIMPLEQUOTE terms
+          LHsTerms
+  | HsThTyQuoteTerm  -- TH_TY_QUOTE terms
+          LHsTerms
+  | HsStrictmarkTerm
+          (Located ([AddAnn],HsSrcBang))
+          LHsTerms
+  | HsUnpackednessTerm
+          (Located ([AddAnn], SourceText, SrcUnpackedness))
+          (LHsType GhcPs)
+  | HsUnpackednessStrictnessTerm
+          (Located ([AddAnn], SourceText, SrcUnpackedness))
+          (Located ([AddAnn], SrcStrictness))
+          (LHsType GhcPs)
+  | HsAtTerm
+          (Located RdrName)
+          (LHsExpr GhcPs)
+  | HsUnderscoreTerm
+  | HsListTerm
+          ([AddAnn],HsExpr GhcPs)
+  | HsFatArrowTerm
+          (LHsContext GhcPs)
+          (LHsType GhcPs)
+  | HsGenName
+          (Located GenData)
+  | HsTupCommas     -- wrap commas as LHsTerm type
+          ([SrcSpan],Int)
+  | HsBarTerms2
+          [LHsTerms]
+  | HsTupBars
+          ([SrcSpan],Int)
+  | HsTupBars0
+          ([SrcSpan],Int)
+  -- | HsTupTerm
+  --         LHsTerms  -- a list of terms”
+
+{-
+
 
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
   --   in a list
@@ -404,128 +535,129 @@ splice).  Thus, we must include some additional information with each `cab` to
 allow the typechecker to obtain the correct GlobalRdrEnv.  Clearly, the simplest
 information to use is the GlobalRdrEnv itself.
 -}
+--
+-- -- data structure for check_fexp
+-- --data HsArg = ValArg (HsExpr GhcPs) | TypeArg (HsExpr GhcPs)
+--
+-- data HsTerm
+--   = HsParTerm
+--           LHsTerms
+--   | HsTupParTerm
+--           LHsTerms
+--   | HsBoxParTerm
+--           LHsTerms
+--   | HsBoxTupParTerm
+--           LHsTerms
+--   | HsBracketTerm
+--           LHsTerms
+--   | HsBacktickTerm
+--           LHsTerms
+--   | HsArrAppTerm
+--           (LHsExpr GhcPs)
+--           (LHsExpr GhcPs)
+--           HsArrAppType Bool
+--   | HsSccAnnTerm
+--           SourceText
+--           StringLiteral
+--           (LHsExpr GhcPs)
+--   | HsTickPragmaTerm
+--           SourceText
+--           (StringLiteral,(Int,Int),(Int,Int))
+--           ((SourceText,SourceText),(SourceText,SourceText))
+--           (LHsExpr GhcPs)
+--   | HsCoreAnnTerm
+--           SourceText
+--           StringLiteral
+--           (LHsExpr GhcPs)
+--   | HsStaticTerm
+--           (LHsExpr GhcPs)
+--   | HsTypeAppTerm
+--           --LHsTerms   -- `terms`
+--           (LHsType GhcPs)  -- `atype`
+--   | HsDollarParenTerm     -- '$(' exp ')'
+--           (LHsExpr GhcPs)
+--   | HsDoubleDollarParenTerm    -- '$$(' exp ')'
+--           (LHsExpr GhcPs)
+--   | HsExpQuoteTerm        -- '[|' exp '|]'
+--           (LHsExpr GhcPs)
+--   | HsTExpQuoteTerm       -- '[||' exp '||]'
+--           (LHsExpr GhcPs)
+--   | HsTypQuoteTerm        -- '[t|' ctype '|]'
+--           (LHsType GhcPs)
+--   | HsPatQuoteTerm        -- '[p|' infixexp '|]'
+--           (LHsExpr GhcPs)
+--   | HsDecQuoteTerm        -- '[d|' cvtopbody '|]'
+--           ([AddAnn],[LHsDecl GhcPs])
+--   | HsParenBarTerm
+--           (LHsExpr GhcPs)
+--           [LHsCmdTop GhcPs]
+--   | HsFBindsTerm
+--           ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))
+--   | HsLetTerm
+--           (Located ([AddAnn],Located (HsLocalBinds GhcPs)))
+--           (LHsExpr  GhcPs)
+--   | HsIfThenElseTerm      -- 'if' exp optSemi 'then' exp optSemi 'else' exp
+--                           -- check here for semicolons
+--           (LHsExpr GhcPs)   -- predicate
+--           (LHsExpr GhcPs)   -- then case
+--           (LHsExpr GhcPs)   -- else case
+--   | HsOnlyIfTerm   -- 'if' ifgdpats
+--           (Located ([AddAnn],[LGRHS GhcPs (LHsExpr GhcPs)]))
+--   | HsLcaseTerm    -- '\\' 'lcase' altslist
+--           (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+--   | HsApatsArrowTerm  -- '\\' apat apats '->' exp
+--           (LPat GhcPs)
+--           [LPat GhcPs]
+--           (LHsExpr GhcPs)
+--   | HsDconTerm   -- terms '::' terms
+--           LHsTerms
+--           LHsType
+--   | HsCaseTerm  -- 'case' exp 'of' altslist  -- exps
+--           (LHsExpr GhcPs)
+--           (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
+--   | HsDoTerm  -- 'do' stmtlist
+--           (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
+--   | HsMdoTerm  -- 'mdo' stmtlist
+--           (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
+--   | HsProcTerm  -- 'proc' aexp '->' exp
+--           (LHsExpr GhcPs)
+--           (LHsExpr GhcPs)
+--   | HsSimplequoteTerm  -- SIMPLEQUOTE terms
+--           LHsTerms
+--   | HsThTyQuoteTerm  -- TH_TY_QUOTE terms
+--           LHsTerms
+--   | HsStrictmarkTerm
+--           (Located ([AddAnn],HsSrcBang))
+--           LHsTerms
+--   | HsUnpackednessTerm
+--           (Located ([AddAnn], SourceText, SrcUnpackedness))
+--           (LHsType GhcPs)
+--   | HsUnpackednessStrictnessTerm
+--           (Located ([AddAnn], SourceText, SrcUnpackedness))
+--           (Located ([AddAnn], SrcStrictness))
+--           (LHsType GhcPs)
+--   | HsAtTerm
+--           (Located RdrName)
+--           (LHsExpr GhcPs)
+--   | HsUnderscoreTerm
+--   | HsListTerm
+--           ([AddAnn],HsExpr GhcPs)
+--   | HsFatArrowTerm
+--           (LHsContext GhcPs)
+--           (LHsType GhcPs)
+--   | HsGenName
+--           (Located GenData)
+--   | HsTupCommas     -- wrap commas as LHsTerm type
+--           ([SrcSpan],Int)
+--   | HsBarTerms2
+--           [LHsTerms]
+--   | HsTupBars
+--           ([SrcSpan],Int)
+--   | HsTupBars0
+--           ([SrcSpan],Int)
+--   -- | HsTupTerm
+--   --         LHsTerms  -- a list of terms”
 
--- data structure for check_fexp
---data HsArg = ValArg (HsExpr GhcPs) | TypeArg (HsExpr GhcPs)
-
-data HsTerm
-  = HsParTerm
-          LHsTerms
-  | HsTupParTerm
-          LHsTerms
-  | HsBoxParTerm
-          LHsTerms
-  | HsBoxTupParTerm
-          LHsTerms
-  | HsBracketTerm
-          LHsTerms
-  | HsBacktickTerm
-          LHsTerms
-  | HsArrAppTerm
-          (LHsExpr GhcPs)
-          (LHsExpr GhcPs)
-          HsArrAppType Bool
-  | HsSccAnnTerm
-          SourceText
-          StringLiteral
-          (LHsExpr GhcPs)
-  | HsTickPragmaTerm
-          SourceText
-          (StringLiteral,(Int,Int),(Int,Int))
-          ((SourceText,SourceText),(SourceText,SourceText))
-          (LHsExpr GhcPs)
-  | HsCoreAnnTerm
-          SourceText
-          StringLiteral
-          (LHsExpr GhcPs)
-  | HsStaticTerm
-          (LHsExpr GhcPs)
-  | HsTypeAppTerm
-          --LHsTerms   -- `terms`
-          (LHsType GhcPs)  -- `atype`
-  | HsDollarParenTerm     -- '$(' exp ')'
-          (LHsExpr GhcPs)
-  | HsDoubleDollarParenTerm    -- '$$(' exp ')'
-          (LHsExpr GhcPs)
-  | HsExpQuoteTerm        -- '[|' exp '|]'
-          (LHsExpr GhcPs)
-  | HsTExpQuoteTerm       -- '[||' exp '||]'
-          (LHsExpr GhcPs)
-  | HsTypQuoteTerm        -- '[t|' ctype '|]'
-          (LHsType GhcPs)
-  | HsPatQuoteTerm        -- '[p|' infixexp '|]'
-          (LHsExpr GhcPs)
-  | HsDecQuoteTerm        -- '[d|' cvtopbody '|]'
-          ([AddAnn],[LHsDecl GhcPs])
-  | HsParenBarTerm
-          (LHsExpr GhcPs)
-          [LHsCmdTop GhcPs]
-  | HsFBindsTerm
-          ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))
-  | HsLetTerm
-          (Located ([AddAnn],Located (HsLocalBinds GhcPs)))
-          (LHsExpr  GhcPs)
-  | HsIfThenElseTerm      -- 'if' exp optSemi 'then' exp optSemi 'else' exp
-                          -- check here for semicolons
-          (LHsExpr GhcPs)   -- predicate
-          (LHsExpr GhcPs)   -- then case
-          (LHsExpr GhcPs)   -- else case
-  | HsOnlyIfTerm   -- 'if' ifgdpats
-          (Located ([AddAnn],[LGRHS GhcPs (LHsExpr GhcPs)]))
-  | HsLcaseTerm    -- '\\' 'lcase' altslist
-          (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
-  | HsApatsArrowTerm  -- '\\' apat apats '->' exp
-          (LPat GhcPs)
-          [LPat GhcPs]
-          (LHsExpr GhcPs)
-  | HsDconTerm   -- terms '::' terms
-          LHsTerms
-          LHsType
-  | HsCaseTerm  -- 'case' exp 'of' altslist  -- exps
-          (LHsExpr GhcPs)
-          (Located ([AddAnn],[LMatch GhcPs (LHsExpr GhcPs)]))
-  | HsDoTerm  -- 'do' stmtlist
-          (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
-  | HsMdoTerm  -- 'mdo' stmtlist
-          (Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)]))
-  | HsProcTerm  -- 'proc' aexp '->' exp
-          (LHsExpr GhcPs)
-          (LHsExpr GhcPs)
-  | HsSimplequoteTerm  -- SIMPLEQUOTE terms
-          LHsTerms
-  | HsThTyQuoteTerm  -- TH_TY_QUOTE terms
-          LHsTerms
-  | HsStrictmarkTerm
-          (Located ([AddAnn],HsSrcBang))
-          LHsTerms
-  | HsUnpackednessTerm
-          (Located ([AddAnn], SourceText, SrcUnpackedness))
-          (LHsType GhcPs)
-  | HsUnpackednessStrictnessTerm
-          (Located ([AddAnn], SourceText, SrcUnpackedness))
-          (Located ([AddAnn], SrcStrictness))
-          (LHsType GhcPs)
-  | HsAtTerm
-          (Located RdrName)
-          (LHsExpr GhcPs)
-  | HsUnderscoreTerm
-  | HsListTerm
-          ([AddAnn],HsExpr GhcPs)
-  | HsFatArrowTerm
-          (LHsContext GhcPs)
-          (LHsType GhcPs)
-  | HsGenName
-          (Located GenData)
-  | HsTupCommas     -- wrap commas as LHsTerm type
-          ([SrcSpan],Int)
-  | HsBarTerms2
-          [LHsTerms]
-  | HsTupBars
-          ([SrcSpan],Int)
-  | HsTupBars0
-          ([SrcSpan],Int)
-  -- | HsTupTerm
-  --         LHsTerms  -- a list of terms”
 
 {-
 data HsTupTerm
@@ -952,7 +1084,6 @@ data HsTupTerm
 --   | TTwiddle    (XTTwiddle p)
 --   | Star        (XStar p)
 -- --EF
-
 
 -- | Extra data fields for a 'RecordCon', added by the type checker
 data RecordConTc = RecordConTc
@@ -3180,3 +3311,4 @@ pprStmtInCtxt ctxt stmt
     ppr_stmt (TransStmt { trS_by = by, trS_using = using
                         , trS_form = form }) = pprTransStmt by using form
     ppr_stmt stmt = pprStmt stmt
+-}

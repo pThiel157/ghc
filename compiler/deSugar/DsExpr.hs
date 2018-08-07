@@ -743,8 +743,8 @@ ds_expr _ (ELazyPat      {})  = panic "dsExpr:ELazyPat"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 ds_expr _ (XExpr         {})  = panic "dsExpr: XExpr"
-ds_expr _ (TArrow        {})  = panic "dsExpr: TArrow"
-ds_expr _ (TTwiddle      {})  = panic "dsExpr: TTwiddle"
+--ds_expr _ (TArrow        {})  = panic "dsExpr: TArrow"
+--ds_expr _ (TTwiddle      {})  = panic "dsExpr: TTwiddle"
 
 
 ------------------------------
