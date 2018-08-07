@@ -43,7 +43,7 @@ import Util
 import Outputable
 import FastString
 import Type
-import HsExpr
+-- import HsExpr
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -1543,9 +1543,6 @@ hsTermNeedsParens p = go
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
     go (XTerm{})                      = True
-    go (TArrow{})                     = False
-    go (TTwiddle{})                   = False
-    gp (Star{})                       = False
 
 -- | @'parenthesizeHsTerm' p e@ checks if @'hsTermNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
