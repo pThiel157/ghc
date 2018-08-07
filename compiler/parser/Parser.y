@@ -2614,7 +2614,7 @@ term      :: { LHsTerm }
           | '_'                           { sL1 $1 $ HsUnderscoreTerm }
           | list                          { sL1 $1 $ HsListTerm $1 } -- Is this right?
           | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
-          | gen_name                      { sL1 $1 $ HsGenName (unloc $1) }
+          | gen_name                      { sL1 $1 $ HsGenName (unLoc $1) }
           -- need to add case: 'name' '@' pattern
           -- '_', ';', '|', '..'
 
@@ -2657,10 +2657,10 @@ gen_name  :: { Located GenData }
 
 tup_terms :: { LHsTerms }  -- expression in texp and type-level from atype
           : terms commas_tup_tail_terms   { $1 ++ $2 }
-          | terms bars                    { $1 ++ (HsTupBars $2) }
+          | terms bars                    { $1 ++ (sL1 $2 $ HsTupBars $2) }
           | bar_terms2                    { [$1] } -- covers the case '(#' bar_types '#)' in atype
-          | commas tup_tail_terms         { (HsTupCommas $1) :  $2}
-          | bars terms bars0              { (HsTupBars $1) ++ $2 ++ (HsTupBars0 $3) }
+          | commas tup_tail_terms         { (sL1 $1 $ HsTupCommas $1) :  $2}
+          | bars terms bars0              { (sL1 $1 $ HsTupBars $1) ++ $2 ++ (sl1 $3 $ HsTupBars0 $3) }
 
 commas_tup_tail_terms :: { LHsTerms }
           : commas tup_tail_terms         { (HsTupCommas $1) : $2 }  -- [HsCommaTerm $1] ++ $2
@@ -3903,10 +3903,10 @@ check_infixexp_top rest = (Nothing, rest)
 check_qop :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_qop ((L sp (HsBacktickTerm t)) : rest)
   | (Just qvarid, []) <- check_qvarid t = let result = do { qvarid' <- qvarid
-                                                           ; return (L sp $ (unloc qvarid')) }
+                                                           ; return (L sp $ (unLoc qvarid')) }
                                            in (Just result, rest)             -- '`' qvarid '`'
   | (Just qconid, []) <- check_qconid t = let result = do { qconid' <- qconid
-                                                           ; return (L sp $ (unloc qconid')) }
+                                                           ; return (L sp $ (unLoc qconid')) }
                                            in (Just result, rest)             -- '`' qconid '`'
 check_qop t
   | x@(Just _, _) <- check_qvarsym t = x                                                           -- qvarsym
@@ -3920,10 +3920,10 @@ check_qopm :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_qopm rest@((L _ (HsGenName (L _ MinusSignData _)))) = (Nothing, rest)
 check_qopm ((L sp (HsBacktickTerm t)) : rest)
   | (Just qvarid, []) <- check_qvarid t = let result = do { qvarid' <- qvarid
-                                                           ; return (L sp $ (unloc qvarid')) }
+                                                           ; return (L sp $ (unLoc qvarid')) }
                                            in (Just result, rest)             -- '`' qvarid '`'
   | (Just qconid, []) <- check_qconid t = let result = do { qconid' <- qconid
-                                                           ; return (L sp $ (unloc qconid')) }
+                                                           ; return (L sp $ (unLoc qconid')) }
                                            in (Just result, rest)             -- '`' qconid '`'
 check_qopm t
   | x@(Just _, _) <- check_qvarsym t = x                                                    -- qvarsym
@@ -3987,11 +3987,11 @@ build_apps firstExpr (TAppArg e : es) = do { es' <- build_apps firstExpr es
 check_aexp :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)   -- Returns the produced rule followed by the rest of the unconsumed tokens
 check_aexp ((L sp (HsAtTerm qvr axp)) : rest) = (Just (return (L sp $ EAsPat noExt qvr axp)), rest)
 
-check_aexp  ((L sp TwiddleData td) : ts)                -- '~' aexp
-  | (Just aexp, rest) <- check_aexp ts
+check_aexp  ((L sp (HsGenName (TwiddleData td))) : rest)                -- '~' aexp
+  | (Just aexp, rest') <- check_aexp rest
   = let result = do { aexp' <- aexp
-                    ; return (L sp ELazyPat noExt aexp')}
-    in (Just result, rest)
+                    ; return (L sp $ ELazyPat noExt aexp')}
+    in (Just result, rest')
 
 check_aexp ((L sp (HsApatsArrowTerm apt apts e)) : rest)  -- '\\' apat apats '->' exp
   = (Just (return (L sp $ HsLam noExt (mkMatchGroup FromSource
@@ -4002,16 +4002,16 @@ check_aexp ((L sp (HsApatsArrowTerm apt apts e)) : rest)  -- '\\' apat apats '->
 check_aexp ((L sp (HsLetTerm bds e)) : rest) = (Just (return (L sp $ HsLet noExt (snd $ unLoc bds) e)), rest)  -- 'let' binds 'in' exp
 check_aexp ((L sp (HsLcaseTerm altslis)) : rest)                                              -- '\\' 'lcase' altslist
   = (Just (return (L sp $ HsLamCase noExt (mkMatchGroup FromSource (snd $ unLoc altslis)))), rest)
-check_aexp ((L sp (HsIfThenElseTerm itet1 itet2 itet3)) : rest) = (Just (L sp $ mkHsIf itet1 itet2 itet3), rest)               -- 'if' exp optSemi 'then' exp optSemi 'else' exp
+check_aexp ((L sp (HsIfThenElseTerm itet1 itet2 itet3)) : rest) = (Just (return (L sp $ mkHsIf itet1 itet2 itet3)), rest)               -- 'if' exp optSemi 'then' exp optSemi 'else' exp
 check_aexp ((L sp (HsOnlyIfTerm ifgdpts)) : rest)     = (Just (return (L sp $ HsMultiIf noExt (reverse $ snd $ unLoc ifgdpts))), rest)  -- 'if' ifgdpats
 check_aexp ((L sp (HsCaseTerm cexp caltlist)) : rest) = (Just (return (L sp $ HsCase noExt cexp (mkMatchGroup                   -- 'case' exp 'of' altslist
                                                                                       FromSource (snd $ unLoc caltlist)))), rest)
 check_aexp ((L sp (HsDoTerm stmtlis)) : rest)  = (Just (return (L sp (mkHsDo DoExpr (snd $ unLoc stmtlis)))), rest)                     -- 'do' stmtlist
-check_aexp ((L sp (HsMdoTerm stmtlis)) : rest) = (Just (return (L sp (MkHsDo MDoExpr (snd $ unLoc stmtlis)))), rest)                    -- 'mdo' stmtlist
-check_aexp ((L sp (HsProcTerm ptaexp ptexp)) : rest) = do { aexp <- (checkPattern empty ptaexp >>= \ p ->
+check_aexp ((L sp (HsMdoTerm stmtlis)) : rest) = (Just (return (L sp (mkHsDo MDoExpr (snd $ unLoc stmtlis)))), rest)                    -- 'mdo' stmtlist
+check_aexp ((L sp (HsProcTerm ptaexp ptexp)) : rest) = (Just (checkPattern empty ptaexp >>= \ p ->
                                                                      checkCommand ptexp >>= \ cmd ->
                                                                      return (L sp $ HsProc noExt p (L sp $ HsCmdTop noExt cmd)))
-                                                          ; (Just (return aexp), rest) }
+                                                              , rest)
 check_aexp t
   | x@(Just _, _) <- check_aexp1 t = x   -- aexp1
 check_aexp rest = (Nothing, rest)                                            -- otherwise return Nothing
@@ -4020,54 +4020,53 @@ check_aexp rest = (Nothing, rest)                                            -- 
 -- ############ Check function for `aexp1`: ############
 check_aexp1 :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_aexp1 t
-  | (Just aexp2, rest) <- check_aexp2 ts
+  | (Just aexp2, rest) <- check_aexp2 t
   = go aexp2 [] rest
       where
-        go :: P LHsExpr
-           -> [([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))]
+        go :: P (LHsExpr GhcPs)
+           -> [Located ([AddAnn],([LHsRecField GhcPs (LHsExpr GhcPs)], Bool))]
            -> LHsTerms
-           -> (Maybe P (LHsExpr GhcPs), LHsTerms)
+           -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
         go aexp2 acc rest
-          | ((L sp HsFBindsTerm fbinds) : rest') <- rest
-          = go aexp2 (fbinds : acc) rest'
+          | ((L sp (HsFBindsTerm fbinds)) : rest') <- rest
+          = go aexp2 ((L sp fbinds) : acc) rest'
           | otherwise
-          = do { aexp1 <- build aexp2 (reverse acc)
-               ; (Just (return aexp1), rest) }
+          = (Just (build aexp2 (reverse acc)), rest)
         build aexp2 [] = aexp2
-        build aexp2 (fbinds : rest) = do { aexp1 <- build rest
-                                         ; r <- mkRecConstrOrUpdate aexp1 (getLoc fbinds)
+        build aexp2 (loc_fbinds@(L sp fbinds) : rest) = do { aexp1 <- build aexp2 rest
+                                         ; r <- mkRecConstrOrUpdate aexp1 sp
                                                                           (snd fbinds)
-                                         ; checkRecordSyntax (sLL rest' fbinds r) }
+                                         ; checkRecordSyntax (sLL aexp1 loc_fbinds r) }
 
 check_aexp1 rest = (Nothing, rest)
 
 -- ############ Check function for `aexp2`: ############
 check_aexp2 :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_aexp2 t
-  | Just (qvarRdrn, rest) <- check_qvar t = let result = do { qvarRdrn' <- qvarRdrn
-                                                            ; return (L (getLoc qvarRdrn') (HsVar noExt $! (unLoc qvarRdrn')))}
-                                            in (Just result, rest)  -- qvar
-  | Just (qconRdrn, rest) <- check_qcon t = let result = do { qconRdrn' <- qconRdrn
-                                                            ; return (L (getLoc qconRdrn') (HsVar noExt $! (unLoc qconRdrn')))}
-                                            in (Just result, rest)  -- qcon
+  | (Just qvar, rest) <- check_qvar t = let result = do { qvar' <- qvar
+                                                        ; return (L (getLoc qvar') $ HsVar noExt $! qvar')}
+                                        in (Just result, rest)  -- qvar
+  | (Just qcon, rest) <- check_qcon t = let result = do { qcon' <- qcon
+                                                        ; return (L (getLoc qcon') $ HsVar noExt $! qcon')}
+                                        in (Just result, rest)  -- qcon
 
-check_aexp2 ((L sp (HsGenName (L _ (IPDupVaridData d)))) : rest) = (Just (return (L sp (HsIPVar noExt $! d))), rest)        -- ipvar
-check_aexp2 ((L sp (HsGenName (L _ (LabelVaridData d)))) : rest) = (Just (return (L sp (HsOverLabel noExt $! d))), rest)    -- overloaded_label
-check_aexp2 ((L sp (HsGenName (L _ (LiteralData d)))) : rest)    = (Just (return (L sp (HsLit noExt $! d))), rest)          -- literal
-check_aexp2 ((L sp (HsGenName (L _ (IntegerData d)))) : rest)    = (Just (return (L sp (HsOverLit noExt $! d))), rest)      -- INTEGER
-check_aexp2 ((L sp (HsGenName (L _ (RationalData d)))) : rest)   = (Just (return (L sp (HsOverLit noExt $! d))), rest)
-check_aexp2 ((L sp (HsGenName (L _ (ThIdSpliceData d)))) : rest) = (Just (return (L sp $ mkHsSpliceE HasDollar      -- TH_ID_SPLICE in splice_exp
+check_aexp2 ((L sp (HsGenName (IPDupVaridData d))) : rest) = (Just (return (L sp (HsIPVar noExt $! HsIPName d))), rest)        -- ipvar
+check_aexp2 ((L sp (HsGenName (LabelVaridData d))) : rest) = (Just (return (L sp (HsOverLabel noExt Nothing $! d))), rest)       -- overloaded_label
+check_aexp2 ((L sp (HsGenName (LiteralData d))) : rest)    = (Just (return (L sp (HsLit noExt $! d))), rest)          -- literal
+check_aexp2 ((L sp (HsGenName (IntegerData d))) : rest)    = (Just (return (L sp (HsOverLit noExt $! d))), rest)      -- INTEGER
+check_aexp2 ((L sp (HsGenName (RationalData d))) : rest)   = (Just (return (L sp (HsOverLit noExt $! d))), rest)
+check_aexp2 ((L sp (HsGenName (ThIdSpliceData d))) : rest) = (Just (return (L sp $ mkHsSpliceE HasDollar      -- TH_ID_SPLICE in splice_exp
                                                                                       (L sp $ HsVar noExt (L sp (mkUnqual varName
                                                                                                                 (getTH_ID_SPLICE $1)))))), rest)
-check_aexp2 ((L sp (HsGenName (L _ (ThIdTySpliceData d)))) : rest) = (Just (return (L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
+check_aexp2 ((L sp (HsGenName (ThIdTySpliceData d))) : rest) = (Just (return (L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
                                                                                   (L sp $ HsVar noExt (L sp (mkUnqual varName
                                                                                                       (getTH_ID_TY_SPLICE $1)))))), rest)
 
-check_aexp2 ((L sp (HsGenName (L _ (QuasiquoteData d)))) : rest)     = (Just (return (L sp $ HsSpliceE noExt (unLoc d))), rest)      -- quasiquote
-check_aexp2 ((L sp (HsBracketTerm (L _ (HsListTerm l)) : [])) : rest) = (Just (return (L sp (snd l))), rest) -- '[' list ']'
-check_aexp2 ((L sp HsUnderscoreTerm) : rest)               = (Just (return (L sp $ EWildPat noExt)), rest)               -- '_'
-check_aexp2 ((L sp (HsDollarParenTerm dpt)) : rest)        = (Just (return (L sp $ mkHsSpliceE HasParens dpt)), rest)    -- '$(' exp ')' in splice_exp
-check_aexp2 ((L sp (HsDoubleDollarParenTerm ddpt)) : rest) = (Just (return (L sp $ mkHsSpliceTE HasParens ddpt)), rest)  -- '$$(' exp ')' in splice_exp
+check_aexp2 ((L sp (HsGenName (QuasiquoteData d))) : rest)        = (Just (return (L sp $ HsSpliceE noExt d)), rest)      -- quasiquote
+check_aexp2 ((L sp (HsBracketTerm (L _ ((HsListTerm l)) : []))) : rest) = (Just (return (L sp (snd l))), rest) -- '[' list ']'
+check_aexp2 ((L sp HsUnderscoreTerm) : rest)                            = (Just (return (L sp $ EWildPat noExt)), rest)               -- '_'
+check_aexp2 ((L sp (HsDollarParenTerm dpt)) : rest)                     = (Just (return (L sp $ mkHsSpliceE HasParens dpt)), rest)    -- '$(' exp ')' in splice_exp
+check_aexp2 ((L sp (HsDoubleDollarParenTerm ddpt)) : rest)              = (Just (return (L sp $ mkHsSpliceTE HasParens ddpt)), rest)  -- '$$(' exp ')' in splice_exp
 
 check_aexp2 ((L sp (HsTupParTerm tpt)) : rest)  -- Tupley stuff
   | (Just tup_exprs, rest) <- check_tup_exprs tpt = let result = do { tup_exprs' <- tup_exprs
@@ -4083,36 +4082,36 @@ check_aexp2 ((L sp (HsSimplequoteTerm sqt)) : rest)
                                               in (Just result, rest)  -- SIMPLEQUOTE  qcon
 
 
-check_aexp2 ((L sp (HsThTyQuoteTerm (L _ (HsGenName (SpecialSymData specialSym))))) : rest)
-  = if specialSym == fsLit "." then (Just (return (L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)))), rest) else (error "don't know")
+-- check_aexp2 ((L sp (HsThTyQuoteTerm (L _ (HsGenName (SpecialSymData specialSym))))) : rest)
+--   = if specialSym == fsLit "." then (Just (return (L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForall' sp)))), rest) else (error "don't know")
 
 check_aexp2 ((L sp (HsThTyQuoteTerm htqt)) : rest)
-  | (L _ (HsGenName (VaridData vd)))         <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName vd)))), rest)     -- VARID in tyvarid
-  | (L _ (HsGenName (SpecialIdData sd)))     <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd)))), rest)     -- special_id in tyvarid
-  | (L _ (HsGenName (UnsafeData ud)))        <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd)))), rest)     -- 'unsafe' in tyvarid
-  | (L _ (HsGenName (SafeData safed)))       <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName safed)))), rest)  -- 'safe' in tyvarid
-  | (L _ (HsGenName (InterruptibleData id))) <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName id)))), rest)     -- 'interruptible' in tyvarid
-  | (L _ (HsGenName (QConidData qd)))        <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qd)))), rest)    -- 'QCONID' in qtycon (oqtycon, ntgtycon, gtycon)
-  | (L _ (HsGenName (ConidData cd)))         <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName cd)))), rest)  -- 'CONID' in tycon (qtycon, oqtycon, ntgtycon, gtycon)
-  | (L _ (HsParTerm []))                     <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName unitTyCon)))), rest)          -- '(' ')' in gtycon
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (ArrowData _))))))      <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName funTyCon)))), rest)     -- '(' '->' ')' in ntgtycon (gtycon)
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (TwiddleData _))))))    <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False eqTyCon_RDR))), rest)               -- '(' '~' ')' in ntgtycon (gtycon)
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (QConsymData qcd))))))  <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qcd)))), rest)    -- QCONSYM in '(' qtyconsym')', oqtycon, ntgtycon
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (QVarsymData qvd))))))  <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qvd)))), rest)    -- QVARSYM in '(' qtyconsym')', oqtycon, ntgtycon
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (ConsymData csd))))))   <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName csd)))), rest)    -- CONSYM in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (VarsymData vsd))))))   <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName vsd)))), rest)    -- VARSYM in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (ColonData _))))))      <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False consDataCon_RDR))), rest)           -- ':' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
-  | (L _ (HsParTerm (L _ (HsGenName (L _ (MinusSignData md)))))) <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName md)))), rest)     -- '-' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
-  | (L _ (HsBoxParTerm []))                                      <- htqt = (Just (return (L sp $ HsBracket noExt (Varbr noExt False (getRdrName unboxedUnitTyCon)))), rest)  -- '(#' '#)' in tyvarid
-  | (L _ (HsBracketTerm []))                                     <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False listTyCon_RDR))), rest)                  -- '[' ']' in ntgtycon
-  | (L _ (HsBoxTupParTerm ((L _ (HsTupCommas c)) : [])))         <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName (tupleTyCon Unboxed (snd c + 1)))))), rest) -- '(' commas ')'  in ntgtycon
-  | (L _ (HsTupParTerm ((L _ (HsTupCommas c)) : [])))            <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName (tupleTyCon Boxed (snd c + 1)))))), rest)   -- '(#' commas '#)' in ntgtycon
+  | ((L _ (HsGenName (VaridData vd))) : [])         <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName vd)))), rest)     -- VARID in tyvarid
+  | ((L _ (HsGenName (SpecialIdData sd))) : [])     <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName sd)))), rest)     -- special_id in tyvarid
+  | ((L _ (HsGenName (UnsafeData ud))) : [])        <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName ud)))), rest)     -- 'unsafe' in tyvarid
+  | ((L _ (HsGenName (SafeData safed))) : [])       <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName safed)))), rest)  -- 'safe' in tyvarid
+  | ((L _ (HsGenName (InterruptibleData id))) : []) <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tvName id)))), rest)     -- 'interruptible' in tyvarid
+  | ((L _ (HsGenName (QConidData qd))) : [])        <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qd)))), rest)    -- 'QCONID' in qtycon (oqtycon, ntgtycon, gtycon)
+  | ((L _ (HsGenName (ConidData cd))) : [])         <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName cd)))), rest)  -- 'CONID' in tycon (qtycon, oqtycon, ntgtycon, gtycon)
+  | ((L _ (HsParTerm [])) : [])                     <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName unitTyCon)))), rest)          -- '(' ')' in gtycon
+  | ((L _ (HsParTerm ((L _ (HsGenName (ArrowData _))) : []))) : [])      <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName funTyCon)))), rest)     -- '(' '->' ')' in ntgtycon (gtycon)
+  | ((L _ (HsParTerm ((L _ (HsGenName (TwiddleData _))) : []))) : [])    <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False eqTyCon_RDR))), rest)               -- '(' '~' ')' in ntgtycon (gtycon)
+  | ((L _ (HsParTerm ((L _ (HsGenName (QConsymData qcd))) : []))) : [])  <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qcd)))), rest)    -- QCONSYM in '(' qtyconsym')', oqtycon, ntgtycon
+  | ((L _ (HsParTerm ((L _ (HsGenName (QVarsymData qvd))) : []))) : [])  <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName qvd)))), rest)    -- QVARSYM in '(' qtyconsym')', oqtycon, ntgtycon
+  | ((L _ (HsParTerm ((L _ (HsGenName (ConsymData csd))) : []))) : [])   <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName csd)))), rest)    -- CONSYM in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
+  | ((L _ (HsParTerm ((L _ (HsGenName (VarsymData vsd))) : []))) : [])   <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName vsd)))), rest)    -- VARSYM in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
+  | ((L _ (HsParTerm ((L _ (HsGenName (ColonData _))) : []))) : [])      <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False consDataCon_RDR))), rest)           -- ':' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
+  | ((L _ (HsParTerm ((L _ (HsGenName (MinusSignData md))) : []))) : []) <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (mkUnqual tcClsName md)))), rest)     -- '-' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
+  | ((L _ (HsBoxParTerm [])) : [])                                      <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName unboxedUnitTyCon)))), rest)  -- '(#' '#)' in tyvarid
+  | ((L _ (HsBracketTerm [])) : [])                                     <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False listTyCon_RDR))), rest)                  -- '[' ']' in ntgtycon
+  | ((L _ (HsBoxTupParTerm ((L _ (HsTupCommas c)) : []))) : [])         <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName (tupleTyCon Unboxed (snd c + 1)))))), rest) -- '(' commas ')'  in ntgtycon
+  | ((L _ (HsTupParTerm ((L _ (HsTupCommas c)) : []))) : [])            <- htqt = (Just (return (L sp $ HsBracket noExt (VarBr noExt False (getRdrName (tupleTyCon Boxed (snd c + 1)))))), rest)   -- '(#' commas '#)' in ntgtycon
 
 check_aexp2 ((L sp (HsExpQuoteTerm eqt)) : rest)       = (Just (return (L sp $ HsBracket noExt (ExpBr noExt eqt))), rest)             -- '[|' exp '|]'
 check_aexp2 ((L sp (HsTExpQuoteTerm teqt)) : rest)     = (Just (return (L sp $ HsBracket noExt (TExpBr noExt teqt))), rest)           -- '[||' exp '||]'
 check_aexp2 ((L sp (HsTypQuoteTerm tqt)) : rest)       = (Just (return (L sp $ HsBracket noExt (TypBr noExt tqt))), rest)             -- '[t|' ctype '|]'
-check_aexp2 ((L sp (HsPatQuoteTerm pqt)) : rest)       = checkPattern empty pqt >>= \p ->                    -- '[p|' infixexp '|]'
-                                                         (Just (return (L sp $ HsBracket noExt (PatBr noExt p))), rest)
+check_aexp2 ((L sp (HsPatQuoteTerm pqt)) : rest)       = let result = checkPattern empty pqt >>= \p -> return (L sp $ HsBracket noExt (PatBr noExt p))                   -- '[p|' infixexp '|]'
+                                                         in (Just result, rest)
 check_aexp2 ((L sp (HsDecQuoteTerm dqt)) : rest)       = (Just (return (L sp $ HsBracket noExt (DecBrL noExt (snd dqt)))), rest)      -- '[d|' cvtopbody '|]'
 check_aexp2 ((L sp (HsParenBarTerm pbt1 pbt2)) : rest) = (Just (return (L sp $ HsArrForm noExt pbt1 Nothing (reverse pbt2))), rest)   -- '(|' aexp2 cmdargs '|)'
 
@@ -4125,7 +4124,7 @@ check_texp t
   = case check_qop rest of
       (Just qop, rest') -> let result = do { infixexp' <- infixexp
                                            ; qop' <- qop
-                                           ; return sLL infixexp' qop' $ SectionL noExt infixexp' qop' }
+                                           ; return (sLL infixexp' qop' $ SectionL noExt infixexp' qop') }
                            in (Just result, rest)
       -- We accept just infixexp here because infixexp is a valid production of exp, which is an explicit production for texp:
       _                 -> x
@@ -4134,13 +4133,16 @@ check_texp t
   = case check_infixexp rest of
       (Just infixexp, rest') -> let result = do { qopm' <- qopm
                                                 ; infixexp' <- infixexp
-                                                ; return sLL qopm' infixexp' $ SectionL noExt qopm' infixexp' }
+                                                ; return (sLL qopm' infixexp' $ SectionL noExt qopm' infixexp') }
                                 in (Just result, rest)
       _                      -> (Nothing, t)
   | (Just exp, rest) <- check_exp t
   = case rest of
       ((L sp (HsGenName (ArrowData _))) : rest') -> case check_texp rest' of
-        (Just texp, rest'') -> (Just (return (sLL exp texp $ EViewPat noExt texp)), rest'')
+        (Just texp, rest'') -> let result = do { exp' <- exp
+                                               ; texp' <- texp
+                                               ; return (sLL exp' texp' $ EViewPat noExt exp' texp') }
+                               in (Just result, rest'')
         _                   -> (Just exp, rest)
       _                   -> (Just exp, rest)
 
@@ -4151,31 +4153,31 @@ check_qcon t
   | x@(Just _, _) <- check_qconid t = x                                                -- qconid
 check_qcon ((L sp (HsParTerm t)) : rest)
   | (Just qconsym, []) <- check_qconsym t = let result = do { qconsym' <- qconsym
-                                                            ; return (L sp $ unloc qconsym') }
+                                                            ; return (L sp $ unLoc qconsym') }
                                             in (Just result, rest)                                       -- '(' qconsym ')'
 check_qcon ((L sp (HsParTerm [])) : rest)    = (Just (return (L sp $ nameRdrName (dataConName unitDataCon))), rest)           -- '(' ')' in qcon
 check_qcon ((L sp (HsBoxParTerm [])) : rest) = (Just (return (L sp $ nameRdrName (dataConName unboxedUnitDataCon))), rest)    -- '(#' '#)' in qcon
-check_qcon ((L sp (HsTupParTerm ((L _ (HsTupCommas c)) : []))) : rest)
-    = (Just (return (L sp $ nameRdrName (dataConName (tupleDataCon Boxed (snd c + 1))))), rest)                                --'(' commas ')' in qcon
+check_qcon ((L sp (HsTupParTerm ((L _ (HsTupCommas tc)) : []))) : rest)
+    = (Just (return (L sp $ nameRdrName (dataConName $ tupleDataCon Boxed (snd tc + 1)))), rest)                                --'(' commas ')' in qcon
 check_qcon ((L sp (HsBoxTupParTerm ((L _ (HsTupCommas tc)) : []))) : rest)
-    = (Just (return (L sp $ nameRdrName (dataConName $ tupleDataCon Unboxed (snd commas + 1)))), rest)                         -- '(#' commas '#)' in qcon
+    = (Just (return (L sp $ nameRdrName (dataConName $ tupleDataCon Unboxed (snd tc + 1)))), rest)                         -- '(#' commas '#)' in qcon
 check_qcon ((L sp (HsBracketTerm [])) : rest)
-    = (Just (return (L sp (HsVar noExt $! nameRdrName (dataConName nilDataCon)))), rest)                                       -- '[' ']' in qcon
+    = (Just (return (L sp $ nameRdrName (dataConName nilDataCon))), rest)                                       -- '[' ']' in qcon
 check_qcon rest = (Nothing, rest)
 
 -- ######## Check function for qvar: ########
 check_qvar :: LHsTerms -> (Maybe (P (Located RdrName)), LHsTerms)
 check_qvar t
   | x@(Just _, _) <- check_qvarid t = x                                 -- qvarid
-check_qvar ((L sp (HsParTerm t)))
+check_qvar ((L sp (HsParTerm t)) : rest)
   | (Just qvarsym, []) <- check_qvarsym t = let result = do { qvarsym' <- qvarsym
-                                                            ; return (L sp $ unloc qvarsym') }
+                                                            ; return (L sp $ unLoc qvarsym') }
                                             in (Just result, rest)
 check_qvar rest = (Nothing, rest)
 
 -- ######## Check function for qconid: ########
 check_qconid :: LHsTerms -> (Maybe (P (Located RdrName)), LHsTerms)
-check_qconid ((L sp (HsGenName (L _ (ConidData d)))) : rest) = (Just (return (L sp $ mkUnqual dataName d)), rest)       -- CONID
+check_qconid ((L sp (HsGenName (ConidData d))) : rest)       = (Just (return (L sp $ mkUnqual dataName d)), rest)       -- CONID
 check_qconid ((L sp (HsGenName (QConidData d))) : rest)      = (Just (return (L sp $ mkQual dataName d)), rest)         -- QCONID
 check_qconid rest = (Nothing, rest)
 
@@ -4218,20 +4220,20 @@ check_tup_exprs t
                                                     ; return ([],Tuple ((sL1 texp' (Present noExt texp')) : snd commas_exprs')) }
                                     in (Just result, rest')
       _                          -> case rest of
-        ((HsTupBars bars) : rest') -> let result = do { texp' <- texp
+        ((L _ (HsTupBars bars)) : rest') -> let result = do { texp' <- texp
                                                       ; return (mvbars (fst bars), Sum 1  (snd bars + 1) texp') }
                                       in (Just result, rest')
         _                          -> (Nothing, t)
-  | ((HsTupCommas commas) : rest) <- t
+  | ((L _ (HsTupCommas commas)) : rest) <- t
   = case check_tup_tail rest of
       (Just tup_tail, rest') -> let result = do { tup_tail' <- tup_tail
                                                 ; return ([],Tuple (map (\l -> L l missingTupArg) (fst commas) ++ tup_tail')) }
                                 in (Just result, rest')
       _                      -> (Nothing, t)
-  | ((HsTupBars bars) : rest) <- t
+  | ((L _ (HsTupBars bars)) : rest) <- t
   = case check_texp rest of
       (Just texp, rest) -> case rest of
-        ((HsTupBars0 bars0) : rest') -> let result = do { texp' <- texp
+        ((L _ (HsTupBars0 bars0)) : rest') -> let result = do { texp' <- texp
                                                         ; return (mvbars (fst bars) ++ mvbars (fst bars0), Sum (snd bars + 1) (snd bars + snd bars0 + 1) texp') }
                                         in (Just result, rest')
         _                            -> (Nothing, t)
@@ -4242,7 +4244,7 @@ check_tup_exprs rest = (Nothing, rest)
 
 -- ######## Check function for `commas_tup_tail` & `tup_tail`: ########
 check_commas_tup_tail :: LHsTerms -> (Maybe (P (SrcSpan,[LHsTupArg GhcPs])), LHsTerms)
-check_commas_tup_tail (HsTupCommas commas : rest)
+check_commas_tup_tail ((L _ (HsTupCommas commas)) : rest)
   | (Just tup_tail, rest') <- check_tup_tail rest
   = let result = do { tup_tail' <- tup_tail
                     ; return (head $ fst commas ,(map (\l -> L l missingTupArg) (tail $ fst commas)) ++ tup_tail') }
@@ -4376,7 +4378,7 @@ check_tup_tail rest = (Just (return [noLoc missingTupArg]), rest)
 
 -- check_aexp2 ((L sp (HsThTyQuoteTerm t)) : [])
 --   = case t of
---       L sp2 (HsGenName (SpecialSymData specialSym)) -> if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForAll' sp)) else error "don't know"
+--       L sp2 (HsGenName (SpecialSymData specialSym)) -> if specialSym == fsLit "." then L sp $ HsBracket noExt (VarBr noExt False (hintExplicitForall' sp)) else error "don't know"
 
 -- check_aexp2 :: LHsTerms -> LHsExpr GhcPs
 -- check_aexp2 lt =
@@ -4405,7 +4407,7 @@ check_tup_tail rest = (Just (return [noLoc missingTupArg]), rest)
 --         L _ (HsGenName (L _ (VarsymData vsd)))    -> L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName vsd))    -- VARSYM in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
 --         L _ (HsGenName (L _ (ColonData _)))       -> L sp $ HsBracket noExt (VarBr noExt False consDataCon_RDR)           -- ':' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
 --         L _ (HsGenName (L _ (MinusSignData md)))  -> L sp $ HsBracket noExt (VarBr noExt False (mkQual tcClsName md))     -- '-' in tyconsym, '(' qtyconsym')', oqtycon, ntgtycon
---     (L _ (HsBoxParTerm []))  -> L sp $ HsBracket noExt (Varbr noExt False (getRdrName unboxedUnitTyCon))  -- '(#' '#)' in tyvarid
+--     (L _ (HsBoxParTerm []))  -> L sp $ HsBracket noExt (VarBr noExt False (getRdrName unboxedUnitTyCon))  -- '(#' '#)' in tyvarid
 --     (L _ (HsBracketTerm [])) -> L sp $ HsBracket noExt (VarBr noExt False listTyCon_RDR)                  -- '[' ']' in ntgtycon
 --     (L _ (HsBoxTupParTerm ((L _ (HsTupCommas c)) : [])))                                                  -- '(' commas ')'  in ntgtycon
 --       -> L sp $ HsBracket noExt (VarBr noExt False (getRdrName (tupleTyCon Unboxed (snd c + 1))))

@@ -315,7 +315,7 @@ data HsTerm
           (LHsContext GhcPs)
           (LHsType GhcPs)
   | HsGenName
-          (Located GenData)
+          (GenData)
   | HsTupCommas     -- wrap commas as LHsTerm type
           ([SrcSpan],Int)
   | HsBarTerms2
