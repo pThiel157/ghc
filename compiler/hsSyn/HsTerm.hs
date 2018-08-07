@@ -43,7 +43,7 @@ import Util
 import Outputable
 import FastString
 import Type
--- import HsExpr
+import HsExpr
 
 -- libraries:
 import Data.Data hiding (Fixity(..))

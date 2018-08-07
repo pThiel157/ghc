@@ -355,8 +355,6 @@ rnExpr e@(EAsPat {})
        }
 rnExpr e@(EViewPat {}) = patSynErr e empty
 rnExpr e@(ELazyPat {}) = patSynErr e empty
-rnExpr e@(TArrow   _)  = typErr    e empty
-rnExpr e@(TTwiddle _)  = typErr    e empty
 
 {-
 ************************************************************************
