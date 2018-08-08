@@ -2743,11 +2743,11 @@ aexp1   :: { LHsExpr GhcPs }
                                      ; checkRecordSyntax (sLL $1 $> r) }}
         | aexp2                { $1 }
 
-parse_type_in_exp :: { LHsExpr GhcPs }
-        : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
-        | qcon                          { sL1 $1 (HsVar noExt   $! $1) }
-        | '(' '->' ')'                  { sLL $1 $> (TArrow noExt) }    -- Annotations here?
-        | '(' '~' ')'                   { sLL $1 $> (TTwiddle noExt) }  -- Annotations here?
+-- parse_type_in_exp :: { LHsExpr GhcPs }
+--         : qvar                          { sL1 $1 (HsVar noExt   $! $1) }
+--         | qcon                          { sL1 $1 (HsVar noExt   $! $1) }
+--         | '(' '->' ')'                  { sLL $1 $> (TArrow noExt) }    -- Annotations here?
+--         | '(' '~' ')'                   { sLL $1 $> (TTwiddle noExt) }  -- Annotations here?
         --ntgtycon                      { sL1 $1 (HsVar noExt   $! $1) }
                                         -- uses pprTrace to trace this funciton whenever it iscalled
                                         -- { pprTrace "TEST_PT" empty (sL1 $1 (HsVar noExt $! $1)}
@@ -3619,7 +3619,7 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
 -- Documentation comments
 
 docnext :: { LHsDocString }
-  : DOCNEXT {% return (sL1 $1 (mkHsDocString (getDOCNEXxT $1))) }
+  : DOCNEXT {% return (sL1 $1 (mkHsDocString (getDOCNEXT $1))) }
 
 docprev :: { LHsDocString }
   : DOCPREV {% return (sL1 $1 (mkHsDocString (getDOCPREV $1))) }
@@ -3822,7 +3822,7 @@ sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 -- helper function for extracting value from HsTerm
 getTerms :: LHsTerm -> [LHsTerms]
-getTerms (HsBarTerms2 ts) = ts
+getTerms (L _ (HsBarTerms2 ts)) = ts
 getTerms _                = error "An error occurred while constructing bar_terms2"
 
 
@@ -3833,13 +3833,13 @@ check_exp ((L sp (HsDconTerm tm tp)) : rest)
   = let result = do { infixexp' <- infixexp
                     ; return (L sp $ ExprWithTySig (mkLHsSigWcType tp) infixexp') }
     in (Just result, rest)                                              -- infixexp '::' sigtype
-check_exp ((L sp (HsArrAppTerm infixe e HsFirstOrderApp True)) : rest)     = (Just (return (L sp $ HsArrApp noExt infixe e  -- infixexp '-<' exp
+check_exp ((L sp (HsArrAppTerm infixe e HsFirstOrderApp True)) : rest)    = (Just (return (L sp $ HsArrApp noExt infixe e  -- infixexp '-<' exp
                                                                                         HsFirstOrderApp True)), rest)
-check_exp ((L sp (HsArrAppTerm aat1 aat2 HsHigherOrderApp False)) : rest) = (Just (return (HsArrApp noExt aat1 aat2        -- infixexp '>>-' exp
+check_exp ((L sp (HsArrAppTerm aat1 aat2 HsHigherOrderApp False)) : rest) = (Just (return (L sp $ HsArrApp noExt aat1 aat2        -- infixexp '>>-' exp
                                                                                         HsHigherOrderApp False)), rest)
-check_exp ((L sp (HsArrAppTerm aat1 aat2 HsHigherOrderApp True)) : rest)  = (Just (return (HsArrApp noExt aat1 aat2         -- infixexp '-<<' exp
+check_exp ((L sp (HsArrAppTerm aat1 aat2 HsHigherOrderApp True)) : rest)  = (Just (return (L sp $ HsArrApp noExt aat1 aat2         -- infixexp '-<<' exp
                                                                                         HsHigherOrderApp True)), rest)
-check_exp ((L sp (HsArrAppTerm aat1 aat2 HsHigherOrderApp False)) : rest) = (Just (return (HsArrApp noExt aat1 aat2        -- infixexp '>>-' exp
+check_exp ((L sp (HsArrAppTerm aat1 aat2 HsHigherOrderApp False)) : rest) = (Just (return (L sp $ HsArrApp noExt aat1 aat2        -- infixexp '>>-' exp
                                                                                         HsHigherOrderApp False)), rest)
 check_exp t
   | x@(Just _, _) <- check_infixexp t = x
@@ -3853,8 +3853,8 @@ check_infixexp t
   | (Just exp10, rest) <- check_exp10 t --(Just exp10, rest)
   = go exp10 [] rest
       where
-        go :: P LHsExpr
-           -> [P LHsExpr]
+        go :: P (LHsExpr GhcPs)
+           -> [P (LHsExpr GhcPs)]
            -> LHsTerms
            -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
         go firstExpr acc rest
@@ -3863,8 +3863,8 @@ check_infixexp t
               (Just exp10, rest'') -> go firstExpr (exp10 : qop : acc) rest''
               otherwise            -> (Nothing, rest')
           | otherwise
-          = do { infixexp <- build_opapps firstExpr (reverse acc)
-               ; (Just (return infixexp), rest) }
+          = (Just (build_opapps firstExpr (reverse acc)), rest)
+        build_opapps :: P (LHsExpr GhcPs) -> [P (LHsExpr GhcPs)] -> P (LHsExpr GhcPs)
         build_opapps firstExpr [] = firstExpr
         build_opapps firstExpr (exp10 : qop : rest) = do { rest' <- build_opapps firstExpr rest
                                                          ; exp10' <- exp10
@@ -3879,8 +3879,8 @@ check_infixexp_top t
   | (Just exp10_top, rest) <- check_exp10_top t
   = go exp10_top [] rest
       where
-        go :: P LHsExpr
-           -> [P LHsExpr]
+        go :: P (LHsExpr GhcPs)
+           -> [P (LHsExpr GhcPs)]
            -> LHsTerms
            -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
         go firstExpr acc rest
@@ -3889,8 +3889,8 @@ check_infixexp_top t
               (Just exp10_top, rest'') -> go firstExpr (exp10_top : qop : acc) rest''
               otherwise                -> (Nothing, rest')
           | otherwise
-          = do { infixexp_top <- build_opapps firstExpr (reverse acc)
-               ; (Just (return infixexp_top), rest) }
+          = (Just (build_opapps firstExpr (reverse acc)), rest)
+        build_opapps :: P (LHsExpr GhcPs) -> [P (LHsExpr GhcPs)] -> P (LHsExpr GhcPs)
         build_opapps firstExpr [] = firstExpr
         build_opapps firstExpr (exp10_top : qop : rest) = do { rest' <- build_opapps firstExpr rest
                                                              ; exp10_top' <- exp10_top
@@ -3903,47 +3903,56 @@ check_infixexp_top rest = (Nothing, rest)
 check_qop :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_qop ((L sp (HsBacktickTerm t)) : rest)
   | (Just qvarid, []) <- check_qvarid t = let result = do { qvarid' <- qvarid
-                                                           ; return (L sp $ (unLoc qvarid')) }
+                                                           ; return (L sp $ HsVar noExt (L sp $ (unLoc qvarid'))) }
                                            in (Just result, rest)             -- '`' qvarid '`'
   | (Just qconid, []) <- check_qconid t = let result = do { qconid' <- qconid
-                                                           ; return (L sp $ (unLoc qconid')) }
+                                                           ; return (L sp $ HsVar noExt (L sp $ (unLoc qconid'))) }
                                            in (Just result, rest)             -- '`' qconid '`'
 check_qop t
-  | x@(Just _, _) <- check_qvarsym t = x                                                           -- qvarsym
-  | x@(Just _, _) <- check_qconsym t = x                                                           -- qconsym
-check_qop ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm))) : rest) = (Just (return (L sp $ EWildPat noExt)), rest)   -- '`' '_' '`'
+ | (Just qvarsym, rest) <- check_qvarsym t = let result = do { qvarsym' <- qvarsym                             -- qvarsym
+                                                             ; return (sL1 qvarsym' $ HsVar noExt qvarsym') }
+                                             in (Just result, rest)
+ | (Just qconsym, rest) <- check_qconsym t = let result = do { qconsym' <- qconsym                             -- qconsym
+                                                             ; return (sL1 qconsym' $ HsVar noExt qconsym') }
+                                             in (Just result, rest)
+check_qop ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm : []))) : rest) = (Just (return (L sp $ EWildPat noExt)), rest)   -- '`' '_' '`'
 check_qop rest = (Nothing, rest)
 
 -- ############ Check function for `qopm`: ############
 check_qopm :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 -- Same as qop, but we filter out minus signs here:
-check_qopm rest@((L _ (HsGenName (L _ MinusSignData _)))) = (Nothing, rest)
+check_qopm rest@((L _ (HsGenName (MinusSignData _))) : _) = (Nothing, rest)
 check_qopm ((L sp (HsBacktickTerm t)) : rest)
-  | (Just qvarid, []) <- check_qvarid t = let result = do { qvarid' <- qvarid
-                                                           ; return (L sp $ (unLoc qvarid')) }
-                                           in (Just result, rest)             -- '`' qvarid '`'
-  | (Just qconid, []) <- check_qconid t = let result = do { qconid' <- qconid
-                                                           ; return (L sp $ (unLoc qconid')) }
-                                           in (Just result, rest)             -- '`' qconid '`'
+  | (Just qvarid, []) <- check_qvarid t = let result = do { qvarid' <- qvarid                    -- '`' qvarid '`'
+                                                          ; return (L sp $ HsVar noExt (L sp $ (unLoc qvarid'))) }
+                                          in (Just result, rest)
+  | (Just qconid, []) <- check_qconid t = let result = do { qconid' <- qconid                    -- '`' qconid '`'
+                                                          ; return (L sp $ HsVar noExt (L sp $ (unLoc qconid'))) }
+                                          in (Just result, rest)
 check_qopm t
-  | x@(Just _, _) <- check_qvarsym t = x                                                    -- qvarsym
-  | x@(Just _, _) <- check_qconsym t = x                                                    -- qconsym
-check_qopm ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm))) : rest) = (Just (return (L sp $ EWildPat noExt)), rest)   -- '`' '_' '`'
+  | (Just qvarsym, rest) <- check_qvarsym t = let result = do { qvarsym' <- qvarsym                             -- qvarsym
+                                                              ; return (sL1 qvarsym' $ HsVar noExt qvarsym') }
+                                              in (Just result, rest)
+  | (Just qconsym, rest) <- check_qconsym t = let result = do { qconsym' <- qconsym                             -- qconsym
+                                                              ; return (sL1 qconsym' $ HsVar noExt qconsym') }
+                                              in (Just result, rest)
+
+check_qopm ((L sp (HsBacktickTerm (L _ HsUnderscoreTerm : []))) : rest) = (Just (return (L sp $ EWildPat noExt)), rest)   -- '`' '_' '`'
 check_qopm rest = (Nothing, rest)
 
 -- ############ Check function for `exp10`: ############
 check_exp10 :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_exp10 t
   | x@(Just _, _) <- check_exp10_top t = x                     -- exp10_top
-check_exp10 ((L sp (HsSccAnnTerm sccann1 sccann2 e)) : rest) = (Just (return (L sp HsSCC noExt sccann1 sccann2 e)), rest)              -- scc_annot exp
+check_exp10 ((L sp (HsSccAnnTerm sccann1 sccann2 e)) : rest) = (Just (return (L sp $ HsSCC noExt sccann1 sccann2 e)), rest)              -- scc_annot exp
 check_exp10 rest = (Nothing, rest)
 
 -- ############ Check function for `exp10_top`: ############
 check_exp10_top :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
-check_exp10_top ((L sp (HsGenName (L _ (MinusSignData _)))) : fexp : rest)                        -- '-' fexp
-  | (Just fexp_result, []) <- check_fexp fexp = let result = do { fexp_result' <- fexp_result
-                                                                ; return (L sp $ NegApp noExt fexp_result' noSyntaxExpr)}
-                                                in (Just result, rest)
+check_exp10_top ((L sp (HsGenName (MinusSignData _))) : rest)                        -- '-' fexp
+  | (Just fexp, rest') <- check_fexp rest = let result = do { fexp' <- fexp
+                                                            ; return (L sp $ NegApp noExt fexp' noSyntaxExpr)}
+                                            in (Just result, rest')
 
 check_exp10_top ((L sp (HsTickPragmaTerm tpt1 tpt2 tpt3 tpt4)) : rest) = (Just (return (L sp $ HsTickPragma noExt tpt1 tpt2 tpt3 tpt4)), rest)  -- hpc_annot exp
 check_exp10_top ((L sp (HsCoreAnnTerm cprags strlit e)) : rest)        = (Just (return (L sp $ HsCoreAnn noExt cprags strlit e)), rest)  -- '{-# CORE' STRING '#-}' exp
@@ -3958,29 +3967,31 @@ check_fexp t
   = fexp_go aexp [] rest
 check_fexp ((L sp (HsStaticTerm saexp)) : rest)
   = fexp_go processed_saexp [] rest
-      where processed_saexp = L sp $ HsStatic noExt saexp
+      where processed_saexp = return (L sp $ HsStatic noExt saexp)
 check_fexp rest = (Nothing, rest)
 
 -- helper functions:
-data HsArg = ValArg (P (HsExpr GhcPs)) | TAppArg (P (HsExpr GhcPs))
+data HsArg = ValArg (P (LHsExpr GhcPs)) | TAppArg (P (LHsType GhcPs))
 fexp_go :: P (LHsExpr GhcPs)
         -> [HsArg]
         -> LHsTerms
         -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 fexp_go firstExpr acc rest
   | ((L sp' (HsTypeAppTerm atp)) : rest') <- rest
-  = fexp_go firstExpr (TAppArg atp : acc) rest'
+  = fexp_go firstExpr (TAppArg (return atp) : acc) rest'
   | (Just aexp', rest') <- check_aexp rest
   = fexp_go firstExpr (ValArg aexp' : acc) rest'
-  | otherwise = do { fexp <- build_apps firstExpr (reverse acc)
-                   ; (Just (return fexp), rest) }
+  | otherwise = (Just (build_apps firstExpr (reverse acc)), rest)
 
+build_apps :: P (LHsExpr GhcPs) -> [HsArg] -> P (LHsExpr GhcPs)
 build_apps firstExpr [] = firstExpr
 build_apps firstExpr (ValArg  e : es) = do { es' <- build_apps firstExpr es
                                            ; e' <- e
-                                           ; return (sLL es' e' $ HsApp es' e') }
+                                           ; checkBlockArguments es'
+                                           ; return (sLL es' e' $ HsApp noExt es' e') }
 build_apps firstExpr (TAppArg e : es) = do { es' <- build_apps firstExpr es
                                            ; e' <- e
+                                           ; checkBlockArguments es'
                                            ; return (sLL es' e' $ HsAppType (mkHsWildCardBndrs e') es') }
 
 -- ############ Check function for `aexp`: ############
@@ -4056,11 +4067,9 @@ check_aexp2 ((L sp (HsGenName (LiteralData d))) : rest)    = (Just (return (L sp
 check_aexp2 ((L sp (HsGenName (IntegerData d))) : rest)    = (Just (return (L sp (HsOverLit noExt $! d))), rest)      -- INTEGER
 check_aexp2 ((L sp (HsGenName (RationalData d))) : rest)   = (Just (return (L sp (HsOverLit noExt $! d))), rest)
 check_aexp2 ((L sp (HsGenName (ThIdSpliceData d))) : rest) = (Just (return (L sp $ mkHsSpliceE HasDollar      -- TH_ID_SPLICE in splice_exp
-                                                                                      (L sp $ HsVar noExt (L sp (mkUnqual varName
-                                                                                                                (getTH_ID_SPLICE $1)))))), rest)
+                                                                                   (L sp $ HsVar noExt (L sp (mkUnqual varName d))))), rest)
 check_aexp2 ((L sp (HsGenName (ThIdTySpliceData d))) : rest) = (Just (return (L sp $ mkHsSpliceTE HasDollar         -- TH_ID_TY_SPLICE in splice_exp
-                                                                                  (L sp $ HsVar noExt (L sp (mkUnqual varName
-                                                                                                      (getTH_ID_TY_SPLICE $1)))))), rest)
+                                                                                     (L sp $ HsVar noExt (L sp (mkUnqual varName d))))), rest)
 
 check_aexp2 ((L sp (HsGenName (QuasiquoteData d))) : rest)        = (Just (return (L sp $ HsSpliceE noExt d)), rest)      -- quasiquote
 check_aexp2 ((L sp (HsBracketTerm (L _ ((HsListTerm l)) : []))) : rest) = (Just (return (L sp (snd l))), rest) -- '[' list ']'
@@ -4070,7 +4079,8 @@ check_aexp2 ((L sp (HsDoubleDollarParenTerm ddpt)) : rest)              = (Just 
 
 check_aexp2 ((L sp (HsTupParTerm tpt)) : rest)  -- Tupley stuff
   | (Just tup_exprs, rest) <- check_tup_exprs tpt = let result = do { tup_exprs' <- tup_exprs
-                                                                    ; return (L sp (mkSumOrTuple Boxed sp (snd tup_exprs'))) }
+                                                                    ; e <- mkSumOrTuple Boxed sp (snd tup_exprs')
+                                                                    ; return (L sp e) }
                                                     in (Just result, rest)
 
 check_aexp2 ((L sp (HsSimplequoteTerm sqt)) : rest)
