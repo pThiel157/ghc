@@ -279,7 +279,7 @@ data HsTerm
           [LPat GhcPs]
           (LHsExpr GhcPs)
   | HsDconTerm   -- terms '::' terms
-          LHsTerms
+          -- LHsTerms
           (LHsType GhcPs)
   | HsCaseTerm  -- 'case' exp 'of' altslist  -- exps
           (LHsExpr GhcPs)
@@ -292,12 +292,12 @@ data HsTerm
           (LHsExpr GhcPs)
           (LHsExpr GhcPs)
   | HsSimplequoteTerm  -- SIMPLEQUOTE terms
-          LHsTerms
+          -- LHsTerms
   | HsThTyQuoteTerm  -- TH_TY_QUOTE terms
-          LHsTerms
+          -- LHsTerms
   | HsStrictmarkTerm
           (Located ([AddAnn],HsSrcBang))
-          LHsTerms
+          -- LHsTerms
   | HsUnpackednessTerm
           (Located ([AddAnn], SourceText, SrcUnpackedness))
           (LHsType GhcPs)
