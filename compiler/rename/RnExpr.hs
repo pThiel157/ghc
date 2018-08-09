@@ -2099,11 +2099,11 @@ patSynErr e explanation = do { addErr (sep [text "Pattern syntax in expression c
                                   explanation)
                  ; return (EWildPat noExt, emptyFVs) }
 
-typErr :: HsExpr GhcPs -> SDoc -> RnM (HsExpr GhcRn, FreeVars)
-typErr e explanation = do { addErr (sep [text "Type syntax in expression context:",
-                               nest 4 (ppr e)] $$
-                                 explanation)
-                ; return (EWildPat noExt, emptyFVs) }
+-- typErr :: HsExpr GhcPs -> SDoc -> RnM (HsExpr GhcRn, FreeVars)
+-- typErr e explanation = do { addErr (sep [text "Type syntax in expression context:",
+--                                nest 4 (ppr e)] $$
+--                                  explanation)
+--                 ; return (EWildPat noExt, emptyFVs) }
 
 badIpBinds :: Outputable a => SDoc -> a -> SDoc
 badIpBinds what binds

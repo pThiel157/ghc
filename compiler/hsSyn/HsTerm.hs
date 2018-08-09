@@ -24,34 +24,34 @@ import GhcPrelude
 import HsDecls
 import HsPat
 import HsLit
-import PlaceHolder ( NameOrRdrName )
+-- import PlaceHolder ( NameOrRdrName )
 import HsExtension
 import HsTypes
 import HsBinds
 
 -- others:
-import TcEvidence
-import CoreSyn
-import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
-import Name
-import NameSet
-import RdrName  ( GlobalRdrEnv )
+-- import TcEvidence
+-- import CoreSyn
+-- import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
+-- import Name
+-- import NameSet
+-- import RdrName  ( GlobalRdrEnv )
 import BasicTypes
-import ConLike
+-- import ConLike
 import SrcLoc
-import Util
-import Outputable
+-- import Util
+-- import Outputable
 import FastString
-import Type
+-- import Type
 import HsExpr
 
 -- libraries:
-import Data.Data hiding (Fixity(..))
-import qualified Data.Data as Data (Fixity(..))
-import Data.Maybe (isNothing)
+-- import Data.Data hiding (Fixity(..))
+-- import qualified Data.Data as Data (Fixity(..))
+-- import Data.Maybe (isNothing)
 
-import GHCi.RemoteTypes ( ForeignRef )
-import qualified Language.Haskell.TH as TH (Q)
+-- import GHCi.RemoteTypes ( ForeignRef )
+-- import qualified Language.Haskell.TH as TH (Q)
 
 -- importing libraries for different types
 import Lexer  -- for `AddAnn`

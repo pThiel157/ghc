@@ -2561,7 +2561,7 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
 
 terms     :: { LHsTerms }
           -- : term                          { [$1] }
-          : term terms                    { $1 : $2 }
+          : term terms                    { pprTrace "Using terms!!!!!" empty ($1 : $2) }
           | {- empty -}                   { [] }
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
