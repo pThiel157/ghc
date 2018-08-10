@@ -1974,8 +1974,8 @@ atype :: { LHsType GhcPs }
 
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
-      {---EF  | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
-                                               [mo $1,mc $2] }  --EF-}
+        | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
+                                               [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
                                              [mo $1,mc $3] }
         | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
