@@ -2358,10 +2358,18 @@ decl    :: { LHsDecl GhcPs }
         | splice_exp            { sLL $1 $> $ mkSpliceDecl $1 }
 
 rhs     :: { Located ([AddAnn],GRHSs GhcPs (LHsExpr GhcPs)) }
-        : '=' exp wherebinds    { sL (comb3 $1 $2 $3)
-                                    ((mj AnnEqual $1 : (fst $ unLoc $3))
-                                    ,GRHSs noExt (unguardedRHS (comb3 $1 $2 $3) $2)
-                                   (snd $ unLoc $3)) }
+        : '=' terms wherebinds    {% pprTrace "Working, about to run check_exp:" empty $ case check_exp $2 of
+                                      (Just exp, []) -> do { exp' <- exp
+                                                           ; return $ pprTrace "in rhs" empty $ sL (comb3 $1 exp' $3)
+                                                        ((mj AnnEqual $1 : (fst $ unLoc $3))
+                                                        ,GRHSs noExt (unguardedRHS (comb3 $1 exp' $3) exp')
+                                                       (snd $ unLoc $3)) }
+                                      (Nothing, rest) -> error "Error in rhs" }
+        -- OLD:
+        -- : '=' exp wherebinds    { sL (comb3 $1 $2 $3)
+        --                               ((mj AnnEqual $1 : (fst $ unLoc $3))
+        --                               ,GRHSs noExt (unguardedRHS (comb3 $1 $2 $3) $2)
+        --                              (snd $ unLoc $3)) }
         | gdrhs wherebinds      { sLL $1 $>  (fst $ unLoc $2
                                     ,GRHSs noExt (reverse (unLoc $1))
                                                     (snd $ unLoc $2)) }
@@ -2471,6 +2479,10 @@ quasiquote :: { Located (HsSplice GhcPs) }
 
 
 exp   :: { LHsExpr GhcPs }
+        -- : terms                  {% case check_exp $1 of
+        --                               (Just exp, rest) -> pprTrace "exp parsed!" empty exp
+        --                               _                -> error "check_exp failure!"}
+        -- OLD:
         : infixexp '::' sigtype {% ams (sLL $1 $> $ ExprWithTySig (mkLHsSigWcType $3) $1)
                                        [mu AnnDcolon $2] }
         | infixexp '-<' exp     {% ams (sLL $1 $> $ HsArrApp noExt $1 $3
@@ -2560,13 +2572,14 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
                                          }
 
 terms     :: { LHsTerms }
-          -- : term                          { [$1] }
-          : term terms                    { pprTrace "Using terms!!!!!" empty ($1 : $2) }
-          | {- empty -}                   { [] }
+          : terms term                    { pprTrace "Using terms!!" empty ($1 ++ [$2]) }
+          | {- empty -}                   { pprTrace "Using EMPTY terms!!" empty [] }
+          -- | term                          { [$1] }
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
 term      :: { LHsTerm }
           : '(' terms ')'                 { sLL $1 $> $ HsParTerm $2 }
+          | '(' ')'                       { sLL $1 $> $ HsParTerm [] }
           -- | '(' tup_terms ')'             { sLL $1 $> $ HsTupParTerm $2 }
           | '(#' terms '#)'               { sLL $1 $> $ HsBoxParTerm $2 }
           -- | '(#' tup_terms '#)'           { sLL $1 $> $ HsBoxTupParTerm $2 }
@@ -2615,15 +2628,7 @@ term      :: { LHsTerm }
           -- | list                          { sL1 $1 $ HsListTerm $1 } -- Is this right?
           | context '=>' ctype            { sLL $1 $> $ HsFatArrowTerm $1 $3 }
           | gen_name                      { sL1 $1 $ HsGenName (unLoc $1) }
-          -- need to add case: 'name' '@' pattern
           -- '_', ';', '|', '..'
-
-{-
-gen_name :: { LHsTerm }
-          : SIMPLEQUOTE gen_name       -- How to encode these? They don't come with a FastString... make one ourselves?
-          | TH_TY_QUOTE gen_name       -- multiple fastStrings and a realsrcspan... what to do for right hand side?
-          | gen_name2
--}
 
 gen_name  :: { Located GenData }
           : 'unsafe'          { sL1 $1 $! mkUnsafeData (fsLit "unsafe") }
@@ -2655,6 +2660,7 @@ gen_name  :: { Located GenData }
           | '-'               { sL1 $1 $! mkMinusSignData (fsLit "-") }
           | special_sym       { sL1 $1 $! mkSpecialSymData (unLoc $1) } -- {special_sym contains '!', '.', '*'}
 
+-- TEMPORARILY COMMENTED OUT FOR TESTING PURPOSES:
 -- tup_terms :: { [HsTerm] }  -- expression in texp and type-level from atype
 --           : terms commas_tup_tail_terms   { $1 ++ $2 }
 --           | terms bars                    { $1 ++ (sL1 $2 $ HsTupBars $2) }
@@ -3551,6 +3557,10 @@ special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
 -- Data constructors
 
 qconid :: { Located RdrName }   -- Qualified or unqualified
+        -- : term                {% case check_qconid ($1:[]) of
+        --                            (Just qconid, rest) -> pprTrace "Working!" empty qconid
+        --                            _                   -> error "We should do something better here" }
+        -- OLD:
         : conid              { $1 }
         | QCONID             { sL1 $1 $! mkQual dataName (getQCONID $1) }
 
@@ -3844,14 +3854,14 @@ check_exp t
                                          in (Just result, rest')                                                              -- infixexp '::' sigtype
       _                                -> x
 
-check_exp rest = (Nothing, rest)
+check_exp rest = pprTrace "Exp check failed" empty (Nothing, rest)
 
 
 -- ############ Check function for `infixexp`: ############
 check_infixexp :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_infixexp t
   | (Just exp10, rest) <- check_exp10 t --(Just exp10, rest)
-  = go exp10 [] rest
+  = pprTrace "In infixexp go function" empty $ go exp10 [] rest
       where
         go :: P (LHsExpr GhcPs)
            -> [P (LHsExpr GhcPs)]
@@ -3871,7 +3881,7 @@ check_infixexp t
                                                          ; qop' <- qop
                                                          ; return (sLL rest' exp10' $ (OpApp noExt rest' qop' exp10')) }
 
-check_infixexp rest = (Nothing, rest)
+check_infixexp rest = pprTrace "Infixexp check failed" empty (Nothing, rest)
 
 -- ############ Check function for `infixexp_top`: ############
 check_infixexp_top :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
@@ -3945,7 +3955,7 @@ check_exp10 :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_exp10 t
   | x@(Just _, _) <- check_exp10_top t = x                     -- exp10_top
 check_exp10 ((L sp (HsSccAnnTerm sccann1 sccann2 e)) : rest) = (Just (return (L sp $ HsSCC noExt sccann1 sccann2 e)), rest)              -- scc_annot exp
-check_exp10 rest = (Nothing, rest)
+check_exp10 rest = pprTrace "Exp10 check failed" empty(Nothing, rest)
 
 -- ############ Check function for `exp10_top`: ############
 check_exp10_top :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
@@ -3958,17 +3968,17 @@ check_exp10_top ((L sp (HsTickPragmaTerm tpt1 tpt2 tpt3 tpt4)) : rest) = (Just (
 check_exp10_top ((L sp (HsCoreAnnTerm cprags strlit e)) : rest)        = (Just (return (L sp $ HsCoreAnn noExt cprags strlit e)), rest)  -- '{-# CORE' STRING '#-}' exp
 check_exp10_top t                                   -- fexp
   | x@(Just _, _) <- check_fexp t = x
-check_exp10_top rest = (Nothing, rest)
+check_exp10_top rest = pprTrace "Exp10_top check failed" empty (Nothing, rest)
 
 -- ############ Check function for `fexp`: ############
 check_fexp :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
 check_fexp t
-  | (Just aexp, rest@(x : xs)) <- check_aexp t
-  = fexp_go aexp [] rest
+  | (Just aexp, rest) <- check_aexp t
+  = pprTrace "In fexp go" empty $ fexp_go aexp [] rest
 check_fexp ((L sp (HsStaticTerm saexp)) : rest)
   = fexp_go processed_saexp [] rest
       where processed_saexp = return (L sp $ HsStatic noExt saexp)
-check_fexp rest = (Nothing, rest)
+check_fexp rest = pprTrace "fexp check failed" empty (Nothing, rest)
 
 -- helper functions:
 data HsArg = ValArg (P (LHsExpr GhcPs)) | TAppArg (P (LHsType GhcPs))
@@ -4025,7 +4035,7 @@ check_aexp ((L sp (HsProcTerm ptaexp ptexp)) : rest) = (Just (checkPattern empty
                                                               , rest)
 check_aexp t
   | x@(Just _, _) <- check_aexp1 t = x   -- aexp1
-check_aexp rest = (Nothing, rest)                                            -- otherwise return Nothing
+check_aexp rest = pprTrace "Aexp check failed" empty (Nothing, rest)                                            -- otherwise return Nothing
 
 
 -- ############ Check function for `aexp1`: ############
@@ -4049,7 +4059,7 @@ check_aexp1 t
                                                                           (snd fbinds)
                                          ; checkRecordSyntax (sLL aexp1 loc_fbinds r) }
 
-check_aexp1 rest = (Nothing, rest)
+check_aexp1 rest = pprTrace "Aexp1 check failed" empty (Nothing, rest)
 
 -- ############ Check function for `aexp2`: ############
 check_aexp2 :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
@@ -4125,7 +4135,7 @@ check_aexp2 ((L sp (HsPatQuoteTerm pqt)) : rest)       = let result = checkPatte
 check_aexp2 ((L sp (HsDecQuoteTerm dqt)) : rest)       = (Just (return (L sp $ HsBracket noExt (DecBrL noExt (snd dqt)))), rest)      -- '[d|' cvtopbody '|]'
 check_aexp2 ((L sp (HsParenBarTerm pbt1 pbt2)) : rest) = (Just (return (L sp $ HsArrForm noExt pbt1 Nothing (reverse pbt2))), rest)   -- '(|' aexp2 cmdargs '|)'
 
-check_aexp2 rest = (Nothing, rest)
+check_aexp2 rest = pprTrace "Aexp2 check failed" empty (Nothing, rest)
 
 -- ######## Check function for texp: ########
 check_texp :: LHsTerms -> (Maybe (P (LHsExpr GhcPs)), LHsTerms)
