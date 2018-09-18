@@ -2574,12 +2574,13 @@ hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,In
 terms     :: { LHsTerms }
           : terms term                    { pprTrace "Using terms!!" empty ($1 ++ [$2]) }
           | {- empty -}                   { pprTrace "Using EMPTY terms!!" empty [] }
-          -- | term                          { [$1] }
+          -- : term                          { [$1] }
+          -- | term term                     { $1 : [$2] }
 
 -- covers `exp`, `atype`, `ctype`, `aexp`, `aexp1`, `aexp2`    -- NOTE: possibly also texp
 term      :: { LHsTerm }
           : '(' terms ')'                 { sLL $1 $> $ HsParTerm $2 }
-          | '(' ')'                       { sLL $1 $> $ HsParTerm [] }
+          -- | '(' ')'                       { sLL $1 $> $ HsParTerm [] }   -- For some reason, this uncommenting this allows us to parse '(' ')' without a parsing error
           -- | '(' tup_terms ')'             { sLL $1 $> $ HsTupParTerm $2 }
           | '(#' terms '#)'               { sLL $1 $> $ HsBoxParTerm $2 }
           -- | '(#' tup_terms '#)'           { sLL $1 $> $ HsBoxTupParTerm $2 }
